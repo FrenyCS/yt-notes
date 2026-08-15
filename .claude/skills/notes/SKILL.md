@@ -13,18 +13,24 @@ el video ni esta conversacion se recuerden. El apunte se lee en frio.
 ### 1. Sacar la transcripcion
 
 ```bash
-./transcribe.sh "<url>"              # default: subtitulos es, luego en
-./transcribe.sh "<url>" --lang en    # forzar el idioma original
+./transcribe.sh "<url>"                 # detecta el idioma original solo
+./transcribe.sh "<url>" --lang es       # forzar uno
+./transcribe.sh "<url>" --list          # ver que hay disponible
 ```
 
-Prefiere el **idioma original del hablante** cuando el video sea una charla de
-alguien con autoridad en el tema. Los subtitulos traducidos de YouTube pierden
-matiz justo en la terminologia, que es lo que se quiere capturar. Si la charla
-es en ingles, corre `--lang en`.
+Sin `--lang`, el script lee el idioma original del video y lo pone primero.
+**Eso es lo que casi siempre se quiere:** los subtitulos traducidos de YouTube
+pierden matiz justo en la terminologia, que es lo que el apunte busca capturar.
+Si una charla en ingles sale con texto en espanol, algo se hizo mal.
 
-El script imprime la ruta del `.txt`. Si falla porque no hay subtitulos,
-muestra que hay disponible con `--list` y preguntale al usuario, **no** asumas
-otro idioma.
+El script imprime la ruta del `.txt`. Si falla porque no hay subtitulos, muestra
+lo disponible con `--list` y preguntale al usuario: **no** asumas otro idioma ni
+caigas en una pista traducida por tu cuenta.
+
+Ojo con las pistas auto-traducidas: YouTube las nombra `<destino>-<origen>`, así
+que `es-en` es "espanol desde ingles". En un video en espanol eso es una
+traduccion de ida y vuelta y el texto sale degradado. El script ya evita
+elegirlas solo; si pasas `--lang` explicito, no las pidas.
 
 ### 2. Leer la transcripcion completa
 

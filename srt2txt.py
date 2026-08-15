@@ -28,6 +28,18 @@ CUE_SETTING_RE = re.compile(r"\b(align|position|line|size):\S+")
 
 SENTENCE_END = (".", "?", "!", "…", '."', '?"', '!"', ".)", "?)", "!)")
 
+# TED y algunos canales meten el credito de transcripcion como primer cue
+# ("Traductor: Fulano / Revisor: Mengano"). Es ruido en el apunte.
+CREDIT_RE = re.compile(
+    r"^(?:(?:traductora?|translator|revisora?|reviewer|traducci[oó]n|"
+    r"revisi[oó]n|subt[ií]tulos|transcri(?:ptor|ber|pci[oó]n))\s*:\s*"
+    r"[^:]+?\s*)+$",
+    re.IGNORECASE,
+)
+# Solo se descartan al principio: mas adelante un ":" parecido puede ser
+# contenido real.
+CREDIT_MAX_CUES = 3
+
 
 def parse_srt(text):
     """Devuelve [(segundos_inicio, texto)] a partir del contenido de un SRT."""
@@ -51,8 +63,12 @@ def parse_srt(text):
         body = html.unescape(body)
         body = re.sub(r"\s+", " ", body).strip()
 
-        if body:
-            cues.append((start, body))
+        if not body:
+            continue
+        if len(cues) < CREDIT_MAX_CUES and CREDIT_RE.match(body):
+            continue
+
+        cues.append((start, body))
     return cues
 
 

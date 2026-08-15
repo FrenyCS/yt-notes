@@ -14,6 +14,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTDIR="${HERE}/salida"
 
 LANGS="es,en"
+LANGS_EXPLICIT=0
 FORCE=0
 LIST_ONLY=0
 URL=""
@@ -41,8 +42,8 @@ die() { echo "error: $*" >&2; exit 1; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --lang)   [ $# -ge 2 ] || die "--lang necesita un valor"; LANGS="$2"; shift 2 ;;
-    --lang=*) LANGS="${1#*=}"; shift ;;
+    --lang)   [ $# -ge 2 ] || die "--lang necesita un valor"; LANGS="$2"; LANGS_EXPLICIT=1; shift 2 ;;
+    --lang=*) LANGS="${1#*=}"; LANGS_EXPLICIT=1; shift ;;
     --list)   LIST_ONLY=1; shift ;;
     --force)  FORCE=1; shift ;;
     --asr)
@@ -115,6 +116,7 @@ META="$(yt-dlp --no-warnings --skip-download \
           --print "%(duration_string)s" \
           --print "%(upload_date>%Y-%m-%d)s" \
           --print "%(webpage_url)s" \
+          --print "%(language)s" \
           "$URL" 2>"$TMPLOG")" || ytdlp_failed "$TMPLOG" "leer la metadata"
 
 TITLE="$(printf '%s\n' "$META"  | awk 'NR==1')"
@@ -122,8 +124,23 @@ CHANNEL="$(printf '%s\n' "$META" | awk 'NR==2')"
 DURATION="$(printf '%s\n' "$META" | awk 'NR==3')"
 UPLOADED="$(printf '%s\n' "$META" | awk 'NR==4')"
 PAGE_URL="$(printf '%s\n' "$META" | awk 'NR==5')"
+LANGUAGE="$(printf '%s\n' "$META" | awk 'NR==6')"
 
 [ -n "$TITLE" ] || die "yt-dlp no devolvio titulo; la URL puede no ser un video."
+
+# Si no se pidio idioma explicito, el original del video va primero. Para un
+# apunte importa la terminologia exacta de quien habla, y los subtitulos
+# traducidos de YouTube la pierden justo ahi.
+if [ "$LANGS_EXPLICIT" -eq 0 ] && [ -n "$LANGUAGE" ] && [ "$LANGUAGE" != "NA" ]; then
+  reordered="$LANGUAGE"
+  saved_ifs="$IFS"; IFS=,
+  for lang in $LANGS; do
+    [ "$lang" = "$LANGUAGE" ] || reordered="${reordered},${lang}"
+  done
+  IFS="$saved_ifs"
+  LANGS="$reordered"
+  echo "  idioma original: $LANGUAGE"
+fi
 
 SLUG="$(python3 "${HERE}/slugify.py" "$TITLE")"
 BASE="${OUTDIR}/${SLUG}"
@@ -155,7 +172,12 @@ find_srt() {
   local found=""
   local IFS=,
   for lang in $LANGS; do
-    for candidate in "${BASE}.${lang}".srt "${BASE}.${lang}"-*.srt; do
+    # Exacto y "-orig" nada mas. Un glob "${lang}-*" seria una trampa: YouTube
+    # nombra las pistas auto-traducidas "<destino>-<origen>", así que "es-*"
+    # tambien matchea es-en ("espanol desde ingles"), que en un video en
+    # espanol es una traduccion de ida y vuelta. Las variantes regionales
+    # (es-419, pt-BR) se piden explicitas con --lang.
+    for candidate in "${BASE}.${lang}".srt "${BASE}.${lang}"-orig.srt; do
       [ -f "$candidate" ] || continue
       found="$candidate"
       break
