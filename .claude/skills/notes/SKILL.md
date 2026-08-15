@@ -65,5 +65,6 @@ Usa el mismo slug del `.txt`. Plantilla en `prompts/notas.md`.
 1. Agrega una linea a `notas/README.md`: `- [Titulo](slug.md) — gancho de una linea`
 2. Dile al usuario la ruta y resume en 2-3 lineas que se capturo.
 
-El `.txt` y el `.srt` se quedan en `salida/` (ignorados por git). El apunte en
-`notas/` si se versiona: ese es el producto.
+Nada de esto se versiona: el repo es la herramienta, no los apuntes. El `.txt` y
+el `.srt` quedan en `salida/` y el apunte en `notas/`, ambos locales. No los
+agregues a git ni sugieras commitearlos.

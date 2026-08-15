@@ -46,8 +46,8 @@ srt2txt.py                 SRT -> parrafos con anclas [mm:ss]. Stdlib.
 slugify.py                 Titulo -> slug ASCII. Stdlib.
 prompts/notas.md           Plantilla del apunte.
 .claude/skills/notes/      La skill /notes.
-notas/                     EL PRODUCTO. Versionado.
-salida/                    Transcripciones. Ignorado por git.
+notas/                     EL PRODUCTO. Local, no versionado.
+salida/                    Transcripciones. Local, no versionado.
 ```
 
 Flujo de `transcribe.sh`:

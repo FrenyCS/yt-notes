@@ -218,6 +218,12 @@ __marimo__/
 .streamlit/secrets.toml
 
 # yt-notes
-# Las transcripciones no se versionan: son derivadas y se regeneran con
-# transcribe.sh. Los apuntes de notas/ si se versionan, que son el producto.
+# Nada del contenido se versiona: este repo es la herramienta, no los apuntes.
+# Las transcripciones son derivadas y se regeneran con transcribe.sh. Los
+# apuntes son personales y crecen sin parar; su valor es local.
 salida/
+
+# Se excluye el contenido y no el directorio: git no desciende en un directorio
+# excluido, asi que "notas/" dejaria sin efecto la negacion de abajo.
+notas/*
+!notas/.gitkeep

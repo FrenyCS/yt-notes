@@ -58,7 +58,8 @@ Re-correr la misma URL reutiliza lo que ya bajó.
 
 ## Cómo queda un apunte
 
-Ver [`notas/`](notas/) para el ejemplo completo. La estructura:
+La plantilla completa está en [`prompts/notas.md`](prompts/notas.md) — `notas/`
+va vacío en un clon nuevo, porque los apuntes son locales. La estructura:
 
 - **Fuente** — canal, duración, fecha, quién habla y por qué es autoridad
 - **Tesis central** — la idea que sostiene la charla, en tres líneas
@@ -103,9 +104,11 @@ srt2txt.py                 SRT -> párrafos con anclas [mm:ss]
 slugify.py                 título -> slug de archivo
 prompts/notas.md           plantilla del apunte
 .claude/skills/notes/      la skill /notes
-notas/                     EL PRODUCTO. Versionado.
-salida/                    transcripciones. Ignorado por git.
+notas/                     EL PRODUCTO. Local, no versionado.
+salida/                    transcripciones. Local, no versionado.
 ```
 
-Las transcripciones no se versionan: son derivadas y se regeneran. Los apuntes
-sí.
+**Este repo es la herramienta, no los apuntes.** Nada del contenido se
+versiona: las transcripciones son derivadas y se regeneran, y los apuntes son
+personales, crecen sin parar y su valor es local. Si quieres respaldarlos o
+llevarlos a otra máquina, sincroniza `notas/` por fuera de git.
