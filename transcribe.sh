@@ -25,14 +25,17 @@ Uso: transcribe.sh <url-de-youtube> [opciones]
 
 Opciones:
   --lang LANGS   Idiomas de subtitulos, por orden de preferencia.
-                 Default: "es,en". Ej: --lang "en" o --lang "es,es-419,en"
+                 Por defecto se usa el idioma original del video, que es lo
+                 que casi siempre se quiere: las pistas traducidas de YouTube
+                 pierden matiz en la terminologia.
+                 Ej: --lang "en" o --lang "es,es-419,en"
   --list         Solo lista los subtitulos disponibles y sale.
   --force        Vuelve a descargar aunque el .srt ya exista.
   -h, --help     Esto.
 
 Salidas (en salida/):
   <slug>.<lang>.srt   Con timestamps, para saltar al minuto exacto.
-  <slug>.txt          Limpio, en parrafos, con anclas [mm:ss].
+  <slug>.<lang>.txt   Limpio, en parrafos, con anclas [mm:ss].
 EOF
 }
 
