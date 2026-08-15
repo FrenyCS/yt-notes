@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# yt-notes
+# Las transcripciones no se versionan: son derivadas y se regeneran con
+# transcribe.sh. Los apuntes de notas/ si se versionan, que son el producto.
+salida/
