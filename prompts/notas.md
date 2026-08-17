@@ -47,6 +47,18 @@ despues contra la fuente.
 Los casos concretos que uso para argumentar. Se olvidan antes que los conceptos
 y son lo que los hace recordables.
 
+## Material de respaldo
+
+Donde esta la version completa de esto. Una charla es la version comprimida;
+aca va lo que la respalda. Cada enlace **verificado**, con una linea de que es
+y por que volver a el.
+
+- [<que es>](<url>) — <por que sirve: "la teoria completa", "el codigo",
+  "las slides con los diagramas">
+
+Si no se encontro nada, decirlo explicitamente para no repetir la busqueda:
+`Buscado repo, slides y blog del autor: no se encontro nada.`
+
 ## Limites de la charla
 
 Que NO cubre, que asume, sobre que contextos aplica. Evita citarla despues como
@@ -67,3 +79,6 @@ trabajo actual, con que choca, que probar.
   propio va en **Notas propias** o marcado en linea.
 - Organizar por concepto, no por orden cronologico del video.
 - Sin relleno. Tres ideas buenas valen mas que diez secciones a medias.
+- **Ningun enlace sin abrir.** En material de respaldo va solo lo verificado.
+  Un enlace inventado en un banco de memoria es peor que ninguno: se lee en
+  frio meses despues, cuando ya no hay como detectar el error.

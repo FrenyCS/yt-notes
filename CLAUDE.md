@@ -53,8 +53,9 @@ salida/                    Transcripciones. Local, no versionado.
 Flujo de `transcribe.sh`:
 
 1. Lee metadata con `yt-dlp --print` (titulo, canal, duracion, fecha, URL,
-   idioma). Sin `--lang`, el idioma original del video pasa al frente de la
-   lista de preferencia.
+   idioma) y vuelca la descripcion a `<slug>.description` con
+   `--print-to-file`. Sin `--lang`, el idioma original del video pasa al
+   frente de la lista de preferencia.
 2. Titulo -> slug via `slugify.py`.
 3. Si el `.srt` ya existe y no hay `--force`, lo reutiliza.
 4. Baja subtitulos publicados (`--write-subs --write-auto-subs`) y los convierte
@@ -75,6 +76,15 @@ a la fuente, no decoracion.
 - En los apuntes, **nunca mezclar lo que dice el autor con la interpretacion
   propia**. Lo propio va en la seccion "Notas propias".
 - Los timestamps no se inventan ni se aproximan. Se copian de las anclas.
+- **Ningun enlace sin abrir.** El material de respaldo va verificado o no va.
+  Un enlace inventado en un banco de memoria es peor que ninguno: se lee en
+  frio meses despues, cuando ya no hay como detectar el error.
+- `--print-to-file` **agrega**, no sobrescribe. Por eso la descripcion pasa por
+  un temporal nuevo en cada corrida y se mueve al final.
+- yt-dlp sale con codigo distinto de cero si falla **cualquiera** de los
+  idiomas pedidos, aunque los otros hayan bajado bien. Lo que decide es si
+  quedo un `.srt` usable, no el codigo de salida. Pedir dos idiomas duplica
+  las peticiones y YouTube devuelve 429 con facilidad.
 - Preferir el **idioma original del hablante** para el apunte. Los subtitulos
   traducidos de YouTube pierden matiz justo en la terminologia. El script ya lo
   hace solo; no lo pises con `--lang` sin razon.

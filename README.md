@@ -53,6 +53,7 @@ Deja en `salida/`:
 |---|---|
 | `<slug>.<lang>.srt` | crudo, con timestamps |
 | `<slug>.<lang>.txt` | limpio, en párrafos, con anclas `[mm:ss]` |
+| `<slug>.description` | la descripción del video, donde suelen estar los enlaces |
 
 Re-correr la misma URL reutiliza lo que ya bajó.
 
@@ -65,11 +66,19 @@ va vacío en un clon nuevo, porque los apuntes son locales. La estructura:
 - **Tesis central** — la idea que sostiene la charla, en tres líneas
 - **Conceptos** — cada uno con su `[mm:ss]`
 - **Frameworks / claims / ejemplos** — lo accionable y lo verificable
+- **Material de respaldo** — repo, slides, blog o paper del autor, verificados
 - **Límites de la charla** — qué NO cubre, para no citarla de más después
 - **Notas propias** — interpretación tuya, separada de lo que dijo el autor
 
 Los timestamps son el punto. Son el enlace de vuelta al minuto exacto cuando
 seis meses después quieres verificar algo o volver a ver ese pedazo.
+
+**Una charla casi nunca es la fuente completa.** Suele ser la versión comprimida
+de algo que existe más extenso: el repo del autor, las slides, el post o el
+paper. Por eso el flujo busca ese material —primero en la descripción del
+video, luego en lo que se menciona en la charla, y si hace falta en la web— y
+lo deja verificado en el apunte. En una charla de Spring I/O, por ejemplo, la
+descripción traía las slides y el repo con toda la teoría.
 
 La plantilla vive en [`prompts/notas.md`](prompts/notas.md) y se puede ajustar.
 

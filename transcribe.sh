@@ -83,6 +83,8 @@ explain_ytdlp_error() {
     echo "El video no existe o fue eliminado."
   elif grep -qi "members-only\|join this channel" "$log"; then
     echo "El video es solo para miembros del canal."
+  elif grep -qi "429\|too many requests" "$log"; then
+    echo "YouTube esta limitando las peticiones (429). Espera unos minutos y reintenta; pedir un solo idioma con --lang ayuda."
   elif grep -qi "unable to download\|unable to extract\|HTTP Error" "$log"; then
     echo "yt-dlp no pudo acceder al video (red, o YouTube cambio algo y toca 'brew upgrade yt-dlp')."
   else
@@ -113,6 +115,14 @@ if [ "$LIST_ONLY" -eq 1 ]; then
 fi
 
 echo "Consultando metadata..."
+
+# La descripcion va a un archivo aparte porque es multilinea y romperia el
+# parseo por linea de --print. Ojo: --print-to-file *agrega*, no sobrescribe,
+# y el destino final depende del slug que sale de esta misma llamada; por eso
+# pasa por un temporal vacio y se mueve despues.
+TMPDESC="$(mktemp -t yt-notes-desc)"
+trap 'rm -f "$TMPLOG" "$TMPDESC"' EXIT
+
 META="$(yt-dlp --no-warnings --skip-download \
           --print "%(title)s" \
           --print "%(channel)s" \
@@ -120,6 +130,7 @@ META="$(yt-dlp --no-warnings --skip-download \
           --print "%(upload_date>%Y-%m-%d)s" \
           --print "%(webpage_url)s" \
           --print "%(language)s" \
+          --print-to-file "%(description)s" "$TMPDESC" \
           "$URL" 2>"$TMPLOG")" || ytdlp_failed "$TMPLOG" "leer la metadata"
 
 TITLE="$(printf '%s\n' "$META"  | awk 'NR==1')"
@@ -153,6 +164,16 @@ echo "  $CHANNEL · ${DURATION:-?} · ${UPLOADED:-?}"
 echo "  slug: $SLUG"
 
 mkdir -p "$OUTDIR"
+
+# La descripcion es donde el autor suele dejar el repo, las slides y el blog:
+# la fuente de material relacionado con mejor rendimiento y sin costo extra.
+DESC="${BASE}.description"
+if [ -s "$TMPDESC" ]; then
+  mv "$TMPDESC" "$DESC"
+else
+  rm -f "$TMPDESC"
+  DESC=""
+fi
 
 # --- subtitulos ---------------------------------------------------------------
 
@@ -203,18 +224,32 @@ if [ -n "$SRT" ] && [ "$FORCE" -eq 0 ]; then
   echo "Ya existe $(basename "$SRT") — reutilizando (usa --force para bajarlo de nuevo)."
 else
   echo "Bajando subtitulos ($LANGS)..."
+  DOWNLOAD_FAILED=0
   yt-dlp --no-warnings --skip-download \
          --write-subs --write-auto-subs \
          --sub-langs "$LANGS" \
          --sub-format "vtt/srt/best" \
          --convert-subs srt \
          -o "${BASE}.%(ext)s" \
-         "$URL" >"$TMPLOG" 2>&1 || ytdlp_failed "$TMPLOG" "bajar los subtitulos"
+         "$URL" >"$TMPLOG" 2>&1 || DOWNLOAD_FAILED=1
 
   SRT="$(find_srt strict || true)"
   if [ -z "$SRT" ]; then
     SRT="$(find_srt loose || true)"
     [ -n "$SRT" ] && echo "aviso: no habia subtitulos en '$LANGS'; usando $(basename "$SRT") en su lugar." >&2
+  fi
+
+  # yt-dlp sale con codigo distinto de cero si falla *cualquiera* de los
+  # idiomas pedidos, aunque los demas hayan bajado bien. Pedir dos idiomas
+  # duplica las peticiones y YouTube responde 429 con facilidad. Lo que
+  # importa es si quedo un .srt usable, no el codigo de salida.
+  if [ "$DOWNLOAD_FAILED" -eq 1 ]; then
+    if [ -z "$SRT" ]; then
+      ytdlp_failed "$TMPLOG" "bajar los subtitulos"
+    fi
+    echo "aviso: yt-dlp fallo en alguno de los idiomas pedidos, pero se obtuvo $(basename "$SRT")." >&2
+    reason="$(explain_ytdlp_error "$TMPLOG" || true)"
+    [ -n "$reason" ] && echo "       $reason" >&2
   fi
 fi
 
@@ -249,3 +284,8 @@ echo
 echo "Listo:"
 echo "  srt: $SRT"
 echo "  txt: $TXT"
+if [ -n "$DESC" ]; then
+  echo "  desc: $DESC"
+  links="$(grep -coE 'https?://[^[:space:]]+' "$DESC" 2>/dev/null || echo 0)"
+  [ "$links" -gt 0 ] && echo "        ($links enlaces — revisa si hay repo, slides o blog)"
+fi
