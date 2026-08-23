@@ -1,13 +1,13 @@
 # Plantilla de apunte
 
-Estructura de `notas/<slug>.md`. Omite las secciones que no apliquen —una
-seccion vacia es peor que ninguna—, pero **Fuente**, **Tesis central** y
+Estructura de `notas/<slug>.md`. Omite las secciones que no apliquen (una
+seccion vacia es peor que ninguna), pero **Fuente**, **Tesis central** y
 **Conceptos** van siempre.
 
 ```markdown
 # <Titulo del video>
 
-**Fuente:** [<Canal> — <Titulo>](<url>) · <duracion> · publicado <YYYY-MM-DD>
+**Fuente:** [<Canal>: <Titulo>](<url>) · <duracion> · publicado <YYYY-MM-DD>
 **Quien habla:** <nombre y por que es autoridad en esto, una linea>
 **Apuntado:** <YYYY-MM-DD> · subtitulos: <lang>
 **Temas:** <tag>, <tag>, <tag>
@@ -53,8 +53,8 @@ Donde esta la version completa de esto. Una charla es la version comprimida;
 aca va lo que la respalda. Cada enlace **verificado**, con una linea de que es
 y por que volver a el.
 
-- [<que es>](<url>) — <por que sirve: "la teoria completa", "el codigo",
-  "las slides con los diagramas">
+- [<que es>](<url>): <por que volver a el, p. ej. "la teoria completa",
+  "el codigo", "las slides con los diagramas">
 
 Si no se encontro nada, decirlo explicitamente para no repetir la busqueda:
 `Buscado repo, slides y blog del autor: no se encontro nada.`
@@ -78,6 +78,9 @@ trabajo actual, con que choca, que probar.
 - Nunca mezclar lo que dice el autor con lo que interpreta quien apunta. Todo lo
   propio va en **Notas propias** o marcado en linea.
 - Organizar por concepto, no por orden cronologico del video.
+- **Sin raya (`—`).** Segun el caso: coma, dos puntos, punto y seguido, o
+  parentesis para los incisos. Aplica a todo el apunte, incluida la linea de
+  **Fuente** y las de material de respaldo.
 - Sin relleno. Tres ideas buenas valen mas que diez secciones a medias.
 - **Ningun enlace sin abrir.** En material de respaldo va solo lo verificado.
   Un enlace inventado en un banco de memoria es peor que ninguno: se lee en
