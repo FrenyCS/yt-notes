@@ -54,12 +54,14 @@ Flujo de `transcribe.sh`:
 
 1. Lee metadata con `yt-dlp --print` (titulo, canal, duracion, fecha, URL,
    idioma) y vuelca la descripcion a `<slug>.description` con
-   `--print-to-file`. Sin `--lang`, el idioma original del video pasa al
-   frente de la lista de preferencia.
+   `--print-to-file`. Sin `--lang`, se pide **solo el idioma original** del
+   video, no una lista.
 2. Titulo -> slug via `slugify.py`.
-3. Si el `.srt` ya existe y no hay `--force`, lo reutiliza.
+3. Revisa que quedo en `salida/` y, sin `--force`, lo reutiliza: primero el
+   `.srt`, y si no, un `.vtt` a medio procesar que convierte con ffmpeg.
 4. Baja subtitulos publicados (`--write-subs --write-auto-subs`) y los convierte
-   a SRT con `--convert-subs srt`.
+   a SRT con `--convert-subs srt`. Si el idioma original no tiene subtitulos,
+   recien ahi reintenta con `es,en`.
 5. Elige el `.srt` segun el orden de preferencia de `--lang`.
 6. `srt2txt.py` -> `.txt` limpio con anclas de tiempo.
 
@@ -83,8 +85,16 @@ a la fuente, no decoracion.
   un temporal nuevo en cada corrida y se mueve al final.
 - yt-dlp sale con codigo distinto de cero si falla **cualquiera** de los
   idiomas pedidos, aunque los otros hayan bajado bien. Lo que decide es si
-  quedo un `.srt` usable, no el codigo de salida. Pedir dos idiomas duplica
-  las peticiones y YouTube devuelve 429 con facilidad.
+  quedo un `.srt` usable, no el codigo de salida.
+- **Un idioma por corrida.** Cada idioma extra es una descarga mas y YouTube
+  devuelve 429 con facilidad. Por eso se pide el original a secas y la lista de
+  respaldo (`es,en`) solo entra si el original no tiene subtitulos. Como yt-dlp
+  reporta la variante regional (`es-US`) pero la pista suele llamarse `es`, se
+  piden ambas: es el mismo idioma y solo existe una de las dos.
+- **yt-dlp borra el `.vtt` al convertirlo a SRT**, así que un `.vtt` que
+  sobreviva en `salida/` significa que la descarga termino pero la conversion
+  no. Pasa cuando un 429 corta la corrida en medio. Convertirlo con ffmpeg es
+  local y gratis; volver a bajarlo cuesta otro 429.
 - Preferir el **idioma original del hablante** para el apunte. Los subtitulos
   traducidos de YouTube pierden matiz justo en la terminologia. El script ya lo
   hace solo; no lo pises con `--lang` sin razon.
@@ -95,11 +105,13 @@ a la fuente, no decoracion.
 
 ## Estado
 
-Probado end-to-end contra YouTube real (charla TED de 14 min, subtitulos
-manuales en `es` y `en`): metadata, slug, descarga, cache, preferencia de
-idioma, dedup de ventana rodante, anclas de tiempo y apunte final. `srt2txt.py`
-tambien probado contra un SRT sintetico con duplicados rodantes y etiquetas
-`<c>`. Errores de yt-dlp (video inexistente, privado, restringido, geobloqueado)
+Probado end-to-end contra YouTube real: charla TED de 14 min (subtitulos
+manuales en `es` y `en`) y podcast de 1 h en `es-US` con subtitulos
+automaticos. Cubre metadata, slug, descarga de un solo idioma, cache de `.srt`,
+recuperacion de un `.vtt` sin convertir, fallback de variante regional
+(`es-US` -> `es`), dedup de ventana rodante, anclas de tiempo y apunte final.
+`srt2txt.py` tambien probado contra un SRT sintetico con duplicados rodantes
+y etiquetas `<c>`. Errores de yt-dlp (video inexistente, privado, restringido, geobloqueado)
 traducidos a mensajes legibles; el de "no existe" verificado contra la red real.
 
 ## Pendientes (en orden)
