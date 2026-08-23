@@ -151,3 +151,7 @@ salida/                    transcripts. Local, untracked.
 transcripts are derived and can be regenerated, and notes are personal, grow
 without end, and their value is local. If you want to back them up or move them
 to another machine, sync `notas/` outside of git.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
