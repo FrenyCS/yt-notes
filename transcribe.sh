@@ -13,7 +13,11 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTDIR="${HERE}/salida"
 
-LANGS="es,en"
+# Respaldo para cuando el idioma original no tiene subtitulos publicados, o
+# cuando yt-dlp no reporta idioma. No se pide junto con el original: cada
+# idioma extra es una peticion mas a YouTube.
+LANGS_FALLBACK="es,en"
+LANGS="$LANGS_FALLBACK"
 LANGS_EXPLICIT=0
 FORCE=0
 LIST_ONLY=0
@@ -30,7 +34,7 @@ Opciones:
                  pierden matiz en la terminologia.
                  Ej: --lang "en" o --lang "es,es-419,en"
   --list         Solo lista los subtitulos disponibles y sale.
-  --force        Vuelve a descargar aunque el .srt ya exista.
+  --force        Vuelve a descargar aunque ya haya subtitulos en salida/.
   -h, --help     Esto.
 
 Salidas (en salida/):
@@ -84,7 +88,7 @@ explain_ytdlp_error() {
   elif grep -qi "members-only\|join this channel" "$log"; then
     echo "El video es solo para miembros del canal."
   elif grep -qi "429\|too many requests" "$log"; then
-    echo "YouTube esta limitando las peticiones (429). Espera unos minutos y reintenta; pedir un solo idioma con --lang ayuda."
+    echo "YouTube esta limitando las peticiones (429). Espera unos minutos y reintenta: lo que alcanzo a bajar se reutiliza sin volver a pedirlo."
   elif grep -qi "unable to download\|unable to extract\|HTTP Error" "$log"; then
     echo "yt-dlp no pudo acceder al video (red, o YouTube cambio algo y toca 'brew upgrade yt-dlp')."
   else
@@ -146,13 +150,13 @@ LANGUAGE="$(printf '%s\n' "$META" | awk 'NR==6')"
 # apunte importa la terminologia exacta de quien habla, y los subtitulos
 # traducidos de YouTube la pierden justo ahi.
 if [ "$LANGS_EXPLICIT" -eq 0 ] && [ -n "$LANGUAGE" ] && [ "$LANGUAGE" != "NA" ]; then
-  reordered="$LANGUAGE"
-  saved_ifs="$IFS"; IFS=,
-  for lang in $LANGS; do
-    [ "$lang" = "$LANGUAGE" ] || reordered="${reordered},${lang}"
-  done
-  IFS="$saved_ifs"
-  LANGS="$reordered"
+  LANGS="$LANGUAGE"
+  # yt-dlp reporta la variante regional ("es-US") pero la pista de subtitulos
+  # suele llamarse a secas ("es"), así que se piden las dos. Sigue siendo un
+  # solo idioma: no hay video con las dos publicadas, baja la que exista.
+  case "$LANGUAGE" in
+    *-*) LANGS="${LANGUAGE},${LANGUAGE%%-*}" ;;
+  esac
   echo "  idioma original: $LANGUAGE"
 fi
 
@@ -177,18 +181,19 @@ fi
 
 # --- subtitulos ---------------------------------------------------------------
 
-# Primer .srt que exista siguiendo el orden de preferencia de --lang.
+# Primer subtitulo con extension $1 que exista siguiendo el orden de
+# preferencia de --lang.
 # Se usa un arreglo con nullglob: un glob sin match da un arreglo vacio en vez
 # de quedarse con el patron literal.
-# Primer argumento: "strict" solo acepta los idiomas pedidos; "loose" acepta
-# cualquier .srt del video como ultimo recurso.
+# Segundo argumento: "strict" solo acepta los idiomas pedidos; "loose" acepta
+# cualquier subtitulo del video como ultimo recurso.
 #
 # La distincion importa: al revisar el cache hay que ser estricto, porque si no
 # un .srt de una corrida anterior en otro idioma hace que --lang deje de tener
 # efecto sin avisar. Despues de bajar si conviene ser flexible, porque YouTube
 # devuelve variantes como "en-orig" que no coinciden literal con lo pedido.
-find_srt() {
-  local mode="$1" lang candidate
+find_sub() {
+  local ext="$1" mode="$2" lang candidate
   local old_nullglob
   old_nullglob="$(shopt -p nullglob || true)"
   shopt -s nullglob
@@ -201,7 +206,7 @@ find_srt() {
     # tambien matchea es-en ("espanol desde ingles"), que en un video en
     # espanol es una traduccion de ida y vuelta. Las variantes regionales
     # (es-419, pt-BR) se piden explicitas con --lang.
-    for candidate in "${BASE}.${lang}".srt "${BASE}.${lang}"-orig.srt; do
+    for candidate in "${BASE}.${lang}.${ext}" "${BASE}.${lang}-orig.${ext}"; do
       [ -f "$candidate" ] || continue
       found="$candidate"
       break
@@ -210,7 +215,7 @@ find_srt() {
   done
 
   if [ -z "$found" ] && [ "$mode" = "loose" ]; then
-    local any=("${BASE}".*.srt)
+    local any=("${BASE}".*."${ext}")
     [ ${#any[@]} -gt 0 ] && found="${any[0]}"
   fi
 
@@ -218,11 +223,29 @@ find_srt() {
   [ -n "$found" ] && printf '%s\n' "$found"
 }
 
-SRT="$(find_srt strict || true)"
+# ffmpeg hace localmente lo mismo que --convert-subs, sin tocar la red.
+vtt_to_srt() {
+  local vtt="$1" srt="${1%.vtt}.srt"
+  ffmpeg -v error -y -i "$vtt" "$srt" </dev/null >/dev/null 2>&1 || return 1
+  [ -s "$srt" ] || return 1
+  printf '%s\n' "$srt"
+}
 
-if [ -n "$SRT" ] && [ "$FORCE" -eq 0 ]; then
-  echo "Ya existe $(basename "$SRT") — reutilizando (usa --force para bajarlo de nuevo)."
-else
+# El .srt que haya en disco, convirtiendo un .vtt si hace falta. Silenciosa:
+# quien llama sabe si el archivo venia de una corrida anterior o de recien.
+resolve_srt() {
+  local mode="$1" srt vtt
+  srt="$(find_sub srt "$mode" || true)"
+  if [ -z "$srt" ]; then
+    vtt="$(find_sub vtt "$mode" || true)"
+    [ -n "$vtt" ] && srt="$(vtt_to_srt "$vtt" || true)"
+  fi
+  [ -n "$srt" ] && printf '%s\n' "$srt"
+}
+
+# Una pasada de descarga para los idiomas que tenga $LANGS. Deja el resultado
+# en $SRT (vacio si no salio nada) y en $DOWNLOAD_FAILED el codigo de yt-dlp.
+download_subs() {
   echo "Bajando subtitulos ($LANGS)..."
   DOWNLOAD_FAILED=0
   yt-dlp --no-warnings --skip-download \
@@ -233,16 +256,52 @@ else
          -o "${BASE}.%(ext)s" \
          "$URL" >"$TMPLOG" 2>&1 || DOWNLOAD_FAILED=1
 
-  SRT="$(find_srt strict || true)"
+  SRT="$(resolve_srt strict || true)"
+}
+
+# Antes de pedir nada, ver que quedo de corridas anteriores. Ademas del .srt,
+# hay que mirar si sobrevivio un .vtt: yt-dlp lo borra al convertirlo, así que
+# uno en disco significa que la descarga termino pero la conversion no. Pasa de
+# verdad cuando un 429 corta la corrida justo en medio, y sin esto la corrida
+# siguiente vuelve a bajar medio mega para nada y se gana otro 429.
+SRT=""
+if [ "$FORCE" -eq 0 ]; then
+  SRT="$(find_sub srt strict || true)"
+  if [ -n "$SRT" ]; then
+    echo "Ya existe $(basename "$SRT") — reutilizando (usa --force para bajarlo de nuevo)."
+  else
+    CACHED_VTT="$(find_sub vtt strict || true)"
+    if [ -n "$CACHED_VTT" ]; then
+      SRT="$(vtt_to_srt "$CACHED_VTT" || true)"
+      if [ -n "$SRT" ]; then
+        echo "Ya estaba $(basename "$CACHED_VTT") a medio procesar: convirtiendo sin volver a descargar."
+      else
+        echo "aviso: $(basename "$CACHED_VTT") esta en disco pero ffmpeg no pudo convertirlo; se baja de nuevo." >&2
+      fi
+    fi
+  fi
+fi
+
+if [ -z "$SRT" ]; then
+  download_subs
+
+  # Se pidio un solo idioma, el original del video. Si ese no tiene subtitulos
+  # publicados, recien aca se gasta una peticion mas con la lista de respaldo:
+  # pedirlos todos de entrada es lo que dispara los 429.
+  if [ -z "$SRT" ] && [ "$LANGS_EXPLICIT" -eq 0 ] && [ "$LANGS" != "$LANGS_FALLBACK" ]; then
+    echo "aviso: el video no tiene subtitulos en '$LANGS'; probando con $LANGS_FALLBACK." >&2
+    LANGS="$LANGS_FALLBACK"
+    download_subs
+  fi
+
   if [ -z "$SRT" ]; then
-    SRT="$(find_srt loose || true)"
+    SRT="$(resolve_srt loose || true)"
     [ -n "$SRT" ] && echo "aviso: no habia subtitulos en '$LANGS'; usando $(basename "$SRT") en su lugar." >&2
   fi
 
   # yt-dlp sale con codigo distinto de cero si falla *cualquiera* de los
-  # idiomas pedidos, aunque los demas hayan bajado bien. Pedir dos idiomas
-  # duplica las peticiones y YouTube responde 429 con facilidad. Lo que
-  # importa es si quedo un .srt usable, no el codigo de salida.
+  # idiomas pedidos, aunque los demas hayan bajado bien. Lo que importa es si
+  # quedo un .srt usable, no el codigo de salida.
   if [ "$DOWNLOAD_FAILED" -eq 1 ]; then
     if [ -z "$SRT" ]; then
       ytdlp_failed "$TMPLOG" "bajar los subtitulos"
