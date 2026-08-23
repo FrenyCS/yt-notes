@@ -10,6 +10,24 @@ el video ni esta conversacion se recuerden. El apunte se lee en frio.
 
 ## Procedimiento
 
+### 0. Decir con que se va a correr
+
+Antes de bajar nada, dile al usuario en dos o tres lineas con que valores por
+defecto vas a trabajar. **No es una pregunta:** sigue de largo en el mismo
+turno. La idea es que sepa que hay perillas, no frenarlo cada vez.
+
+| Que | Por defecto | Como cambiarlo |
+|---|---|---|
+| Subtitulos | idioma original del video, detectado solo | pedir otro idioma, o `--list` para ver que hay |
+| Idioma del apunte | el de la conversacion, aunque la charla este en otro | pedir el del video, o cualquier otro |
+| Material de respaldo | se busca y se verifica cada enlace | saltarlo si hay prisa |
+| Alcance | apunte completo segun la plantilla | mas corto, o centrado en un tema |
+| Destino | `notas/<slug>.md`, local y sin versionar | otra ruta |
+
+Si el usuario ya dijo lo que quiere al invocar la skill ("en ingles", "solo lo
+que diga de embudos"), respetalo y **no repitas el menu**: confirmalo en una
+linea y arranca.
+
 ### 1. Sacar la transcripcion
 
 ```bash
@@ -39,6 +57,13 @@ Lee el `.txt` entero antes de escribir nada. Los parrafos vienen con anclas
 
 No resumas mientras lees. Primero entiende el argumento completo: muchas
 charlas ponen la tesis real al final, no al principio.
+
+**Detecta si los subtitulos son automaticos.** El indicio son las cifras rotas
+("7 m,0000000esó", "$,000 al mes") y los nombres propios deformados ("Pure
+Research" por Pew Research). En los videos con subtitulos manuales esto no
+pasa, pero en podcasts largos es la norma. Cuando el texto venga asi, marca en
+el apunte las cifras y los nombres como no verificados en vez de copiarlos como
+si fueran fieles: el apunte se lee en frio y no habra forma de saberlo despues.
 
 ### 3. Buscar el material de respaldo
 
@@ -100,6 +125,10 @@ Usa el mismo slug del `.txt`. Plantilla en `prompts/notas.md`.
    El gancho arranca con el contenido, no con "Autor:", que dejaria dos puntos
    dobles en la misma linea.
 2. Dile al usuario la ruta y resume en 2-3 lineas que se capturo.
+3. Di tambien lo que quedo por debajo de lo util: subtitulos automaticos que
+   destrozaron cifras, material de respaldo que no aparecio, atribuciones que
+   no cuadraron al verificarlas. Eso es lo que el usuario necesita para decidir
+   si vuelve a la fuente.
 
 Nada de esto se versiona: el repo es la herramienta, no los apuntes. El `.txt` y
 el `.srt` quedan en `salida/` y el apunte en `notas/`, ambos locales. No los
