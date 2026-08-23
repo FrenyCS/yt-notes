@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Titulo -> slug ASCII apto para nombre de archivo.
+"""Title -> ASCII slug usable as a filename.
 
-Existe como helper de Python y no como pipeline de sed/tr porque el sed y el tr
-de BSD no manejan igual que los de GNU ni las clases de caracteres multibyte ni
-las mayusculas acentuadas. Aca se resuelve con unicodedata y queda igual en
-cualquier maquina.
+This is a Python helper and not a sed/tr pipeline because BSD sed and tr do not
+handle multibyte character classes or accented uppercase the way the GNU ones
+do. Here unicodedata settles it, and the result is the same on any machine.
 
-Solo stdlib.
+Stdlib only.
 """
 
 import re
@@ -17,8 +16,10 @@ MAX_LEN = 60
 
 
 def slugify(text, max_len=MAX_LEN):
-    # NFKD separa la tilde de la letra; el filtro ASCII la descarta.
+    # NFKD splits the accent off the letter; the ASCII filter then drops it.
     text = unicodedata.normalize("NFKD", text)
+    # NFKD leaves "n" + combining tilde, which the ASCII filter would reduce to
+    # a bare "n" anyway, but being explicit keeps Spanish titles predictable.
     text = text.replace("ñ", "n").replace("Ñ", "N")
     text = text.encode("ascii", "ignore").decode("ascii")
     text = text.lower()
@@ -28,7 +29,7 @@ def slugify(text, max_len=MAX_LEN):
     if len(text) > max_len:
         text = text[:max_len].rsplit("-", 1)[0] or text[:max_len]
 
-    return text.strip("-") or "sin-titulo"
+    return text.strip("-") or "untitled"
 
 
 if __name__ == "__main__":
