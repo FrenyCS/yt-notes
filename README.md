@@ -1,123 +1,153 @@
 # yt-notes
 
-Convierte una charla de YouTube en un apunte `.md` de conceptos, con timestamps
-de vuelta a la fuente.
+Turn a YouTube talk into a concept note in Markdown, with timestamps back to
+the source.
 
-La idea: cuando ves una charla buena —alguien con autoridad real en un tema,
-explicando ideas y estrategia— quieres quedarte con eso. No con un resumen que
-se lee bonito y se olvida, sino con algo que sirva de banco de memoria: se lee
-en frío meses después y se puede pegar como contexto al trabajar en un tema
-relacionado.
+The idea: when you watch a good talk (someone with real authority on a subject,
+explaining ideas and strategy) you want to keep what you learned. Not a summary
+that reads well and is forgotten, but something that works as a memory bank:
+you read it cold months later, and you can paste it as context when you work on
+a related problem.
 
-**La transcripción es plomería. El producto es `notas/*.md`.**
+**The transcript is plumbing. The product is `notas/*.md`.**
 
-## Requisitos
+## Requirements
 
-macOS con Apple Silicon. Todo lo demás:
+macOS on Apple Silicon. Everything else:
 
 ```bash
 brew install yt-dlp ffmpeg
 ```
 
-`ffmpeg` no es opcional: YouTube sirve los subtítulos en VTT y la conversión a
-SRT pasa por él. Los scripts de Python usan solo stdlib, así que no hay nada
-que instalar ahí.
+`ffmpeg` is not optional: YouTube serves subtitles as VTT and the conversion to
+SRT goes through it. The Python scripts use the standard library only, so there
+is nothing to install there.
 
-## Uso
+## Usage
 
-Dentro de una sesión de Claude Code, en este repo:
+Inside a Claude Code session, in this repo:
 
 ```
 /notes https://www.youtube.com/watch?v=...
 ```
 
-Eso baja los subtítulos, lee la transcripción completa y escribe
-`notas/<slug>.md`. **El resumen lo hace Claude en la sesión**, no un script ni
-una llamada a la API: no hay API key ni facturación aparte, y puedes corregir y
-preguntar mientras se escribe.
+That downloads the subtitles, reads the full transcript and writes
+`notas/<slug>.md`. **Claude writes the note in the session**, not a script and
+not an API call: there is no API key and no separate billing, and you can ask
+questions and correct things while it is being written.
 
-### Solo la transcripción
+### Defaults, and how to change them
 
-Si quieres el texto y nada más:
+The skill tells you what it is about to do before it starts. These are the
+defaults:
+
+| What | Default | How to change it |
+|---|---|---|
+| Subtitles | the video's original language, detected automatically | ask for another language, or `--list` to see what exists |
+| Note language | the language you are talking in, even if the talk is in another | ask for the video's language, or any other |
+| Supporting material | searched for, and every link verified | skip it if you are in a hurry |
+| Scope | full note, following the template | shorter, or focused on one topic |
+| Destination | `notas/<slug>.md`, local and untracked | another path |
+
+You can say any of this when you invoke the skill ("in English", "just the part
+about funnels") or while the note is being written.
+
+### Transcript only
+
+If you want the text and nothing else:
 
 ```bash
-./transcribe.sh "<url>"              # detecta el idioma original del video
-./transcribe.sh "<url>" --lang es    # forzar idioma
-./transcribe.sh "<url>" --list       # ver qué subtítulos hay
-./transcribe.sh "<url>" --force      # re-descargar ignorando lo cacheado
+./transcribe.sh "<url>"              # detects the video's original language
+./transcribe.sh "<url>" --lang es    # force a language
+./transcribe.sh "<url>" --list       # see which subtitles exist
+./transcribe.sh "<url>" --force      # re-download, ignoring the cache
 ```
 
-Deja en `salida/`:
+It leaves this in `salida/`:
 
-| Archivo | Qué es |
+| File | What it is |
 |---|---|
-| `<slug>.<lang>.srt` | crudo, con timestamps |
-| `<slug>.<lang>.txt` | limpio, en párrafos, con anclas `[mm:ss]` |
-| `<slug>.description` | la descripción del video, donde suelen estar los enlaces |
+| `<slug>.<lang>.srt` | raw, with timestamps |
+| `<slug>.<lang>.txt` | clean, in paragraphs, with `[mm:ss]` anchors |
+| `<slug>.description` | the video description, where the links usually are |
 
-Re-correr la misma URL reutiliza lo que ya bajó.
+Re-running the same URL reuses whatever was already downloaded, including a
+`.vtt` that was downloaded but never converted, which is what a rate-limit
+error in the middle of a run leaves behind.
 
-## Cómo queda un apunte
+## What a note looks like
 
-La plantilla completa está en [`prompts/notas.md`](prompts/notas.md) — `notas/`
-va vacío en un clon nuevo, porque los apuntes son locales. La estructura:
+The full template is in [`prompts/notas.md`](prompts/notas.md). `notas/` is
+empty in a fresh clone, because notes are local. The structure:
 
-- **Fuente** — canal, duración, fecha, quién habla y por qué es autoridad
-- **Tesis central** — la idea que sostiene la charla, en tres líneas
-- **Conceptos** — cada uno con su `[mm:ss]`
-- **Frameworks / claims / ejemplos** — lo accionable y lo verificable
-- **Material de respaldo** — repo, slides, blog o paper del autor, verificados
-- **Límites de la charla** — qué NO cubre, para no citarla de más después
-- **Notas propias** — interpretación tuya, separada de lo que dijo el autor
+- **Source**: channel, duration, date, who is speaking and why they have
+  authority on this
+- **Central thesis**: the idea holding the talk together, in three lines
+- **Concepts**: each one with its `[mm:ss]`
+- **Frameworks, claims, examples**: the actionable and the verifiable
+- **Supporting material**: the author's repo, slides, blog or paper, verified
+- **Limits of the talk**: what it does NOT cover, so you do not cite it later
+  as authority on something it never touched
+- **Your own notes**: your interpretation, kept separate from what the speaker
+  actually said
 
-Los timestamps son el punto. Son el enlace de vuelta al minuto exacto cuando
-seis meses después quieres verificar algo o volver a ver ese pedazo.
+The timestamps are the point. They are the link back to the exact minute when,
+six months later, you want to verify something or rewatch that part.
 
-**Una charla casi nunca es la fuente completa.** Suele ser la versión comprimida
-de algo que existe más extenso: el repo del autor, las slides, el post o el
-paper. Por eso el flujo busca ese material —primero en la descripción del
-video, luego en lo que se menciona en la charla, y si hace falta en la web— y
-lo deja verificado en el apunte. En una charla de Spring I/O, por ejemplo, la
-descripción traía las slides y el repo con toda la teoría.
+**A talk is almost never the complete source.** It is usually the compressed
+version of something that exists at greater length: the author's repo, the
+slides, the post or the paper. So the flow goes looking for that material,
+first in the video description, then in what is mentioned during the talk, and
+on the web if needed. Every link is opened and verified before it goes in. A
+wrong link in a memory bank is worse than no link: you read it cold months
+later, when there is no way left to catch the error.
 
-La plantilla vive en [`prompts/notas.md`](prompts/notas.md) y se puede ajustar.
+## About language
 
-## Sobre el idioma
+Worth knowing, because it is the least obvious trap in the project.
 
-Vale la pena saber esto porque es la trampa menos obvia del proyecto.
+Without `--lang`, the script detects the video's original language and asks for
+that one only. This is almost always what you want: YouTube's translated
+subtitles lose nuance exactly in the terminology, which is what the note is
+trying to capture.
 
-Sin `--lang`, el script detecta el idioma original del video y lo prefiere. Es
-casi siempre lo que quieres: los subtítulos traducidos de YouTube pierden matiz
-justo en la terminología, que es lo que el apunte busca capturar.
+Only one language is requested per run. Every extra language is another
+download and another chance of a 429 from YouTube, so the fallback list
+(`es,en`) is only used if the original language has no published subtitles.
 
-YouTube nombra las pistas auto-traducidas `<destino>-<origen>`. O sea `es-en`
-es "español **desde** inglés" — en un video que ya está en español, una
-traducción de ida y vuelta. El script nunca las elige solo; si pasas `--lang`
-explícito, no las pidas.
+YouTube names auto-translated tracks `<target>-<source>`. So `es-en` means
+"Spanish **from** English": on a video that is already in Spanish, that is a
+round trip through another language. The script never picks those on its own.
+If you pass `--lang` explicitly, do not ask for them.
 
-Con `--list` ves qué hay antes de decidir.
+Use `--list` to see what exists before deciding.
 
-## Limitaciones
+## Limitations
 
-- **Solo videos con subtítulos publicados.** No hace transcripción por audio
-  todavía; `--asr` sale con un error explícito. La mayoría de charlas de gente
-  con autoridad tienen subtítulos, así que no ha hecho falta.
-- Videos privados, de miembros, con restricción de edad o geobloqueados fallan
-  con un mensaje que explica cuál de esos casos es.
+- **Only videos with published subtitles.** There is no audio transcription
+  yet; `--asr` exits with an explicit error. Most talks by people worth
+  listening to have subtitles, so it has not been needed.
+- **Auto-generated subtitles degrade numbers and proper names.** On long
+  podcasts this is the norm rather than the exception, and figures come out
+  mangled. The note marks them as unverified instead of presenting them as
+  faithful, but it is a reason to go back to the source before reusing a
+  number.
+- Private, members-only, age-restricted or geo-blocked videos fail with a
+  message explaining which of those cases it is.
 
-## Estructura
+## Layout
 
 ```
 transcribe.sh              URL -> .srt + .txt
-srt2txt.py                 SRT -> párrafos con anclas [mm:ss]
-slugify.py                 título -> slug de archivo
-prompts/notas.md           plantilla del apunte
-.claude/skills/notes/      la skill /notes
-notas/                     EL PRODUCTO. Local, no versionado.
-salida/                    transcripciones. Local, no versionado.
+srt2txt.py                 SRT -> paragraphs with [mm:ss] anchors
+slugify.py                 title -> file slug
+prompts/notas.md           the note template
+.claude/skills/notes/      the /notes skill
+notas/                     THE PRODUCT. Local, untracked.
+salida/                    transcripts. Local, untracked.
 ```
 
-**Este repo es la herramienta, no los apuntes.** Nada del contenido se
-versiona: las transcripciones son derivadas y se regeneran, y los apuntes son
-personales, crecen sin parar y su valor es local. Si quieres respaldarlos o
-llevarlos a otra máquina, sincroniza `notas/` por fuera de git.
+**This repo is the tool, not the notes.** None of the content is versioned:
+transcripts are derived and can be regenerated, and notes are personal, grow
+without end, and their value is local. If you want to back them up or move them
+to another machine, sync `notas/` outside of git.
