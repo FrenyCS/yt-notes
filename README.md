@@ -9,7 +9,7 @@ that reads well and is forgotten, but something that works as a memory bank:
 you read it cold months later, and you can paste it as context when you work on
 a related problem.
 
-**The transcript is plumbing. The product is `notas/*.md`.**
+**The transcript is plumbing. The product is `notes/*.md`.**
 
 ## Requirements
 
@@ -32,7 +32,7 @@ Inside a Claude Code session, in this repo:
 ```
 
 That downloads the subtitles, reads the full transcript and writes
-`notas/<slug>.md`. **Claude writes the note in the session**, not a script and
+`notes/<slug>.md`. **Claude writes the note in the session**, not a script and
 not an API call: there is no API key and no separate billing, and you can ask
 questions and correct things while it is being written.
 
@@ -44,12 +44,12 @@ defaults:
 | What | Default | How to change it |
 |---|---|---|
 | Subtitles | the video's original language, detected automatically | ask for another language, or `--list` to see what exists |
-| Note language | the language you are talking in, even if the talk is in another | ask for the video's language, or any other |
+| Note language | English, whatever the language of the video | ask for another one |
 | Supporting material | searched for, and every link verified | skip it if you are in a hurry |
 | Scope | full note, following the template | shorter, or focused on one topic |
-| Destination | `notas/<slug>.md`, local and untracked | another path |
+| Destination | `notes/<slug>.md`, local and untracked | another path |
 
-You can say any of this when you invoke the skill ("in English", "just the part
+You can say any of this when you invoke the skill ("in Spanish", "just the part
 about funnels") or while the note is being written.
 
 ### Transcript only
@@ -63,7 +63,7 @@ If you want the text and nothing else:
 ./transcribe.sh "<url>" --force      # re-download, ignoring the cache
 ```
 
-It leaves this in `salida/`:
+It leaves this in `output/`:
 
 | File | What it is |
 |---|---|
@@ -77,8 +77,8 @@ error in the middle of a run leaves behind.
 
 ## What a note looks like
 
-The full template is in [`prompts/notas.md`](prompts/notas.md). `notas/` is
-empty in a fresh clone, because notes are local. The structure:
+The full template is in [`prompts/note-template.md`](prompts/note-template.md).
+`notes/` is empty in a fresh clone, because notes are local. The structure:
 
 - **Source**: channel, duration, date, who is speaking and why they have
   authority on this
@@ -141,16 +141,16 @@ Use `--list` to see what exists before deciding.
 transcribe.sh              URL -> .srt + .txt
 srt2txt.py                 SRT -> paragraphs with [mm:ss] anchors
 slugify.py                 title -> file slug
-prompts/notas.md           the note template
+prompts/note-template.md   the note template
 .claude/skills/notes/      the /notes skill
-notas/                     THE PRODUCT. Local, untracked.
-salida/                    transcripts. Local, untracked.
+notes/                     THE PRODUCT. Local, untracked.
+output/                    transcripts. Local, untracked.
 ```
 
 **This repo is the tool, not the notes.** None of the content is versioned:
 transcripts are derived and can be regenerated, and notes are personal, grow
 without end, and their value is local. If you want to back them up or move them
-to another machine, sync `notas/` outside of git.
+to another machine, sync `notes/` outside of git.
 
 ## License
 

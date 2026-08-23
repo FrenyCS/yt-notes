@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""SRT -> texto plano con anclas de tiempo.
+"""SRT -> plain text with time anchors.
 
-Los subtitulos automaticos de YouTube llegan en "rolling window": cada cue
-repite la cola del anterior mas una o dos palabras nuevas. Pegar los cues tal
-cual produce un texto tres veces mas largo y basicamente ilegible. Aca se
-resuelve buscando, para cada cue, el solape mas largo entre lo acumulado y lo
-que entra, y agregando solo el resto.
+YouTube's auto-generated subtitles arrive as a rolling window: every cue
+repeats the tail of the previous one plus a word or two. Joining the cues as
+they come produces text three times too long and basically unreadable. This is
+solved by finding, for each cue, the longest overlap between what has been
+accumulated and what is coming in, and appending only the remainder.
 
-La salida son parrafos con un ancla [mm:ss] al inicio, para poder volver al
-minuto exacto del video desde los apuntes.
+The output is paragraphs with an [mm:ss] anchor at the start, so a note can
+link back to the exact minute of the video.
 
-Solo stdlib.
+Stdlib only.
 """
 
 import argparse
@@ -23,26 +23,27 @@ TIME_RE = re.compile(
     r"(\d+):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d+):(\d{2}):(\d{2})[,.](\d{3})"
 )
 TAG_RE = re.compile(r"<[^>]*>")
-# Los .srt convertidos desde VTT a veces conservan la linea de posicion.
+# .srt files converted from VTT sometimes keep the positioning line.
 CUE_SETTING_RE = re.compile(r"\b(align|position|line|size):\S+")
 
 SENTENCE_END = (".", "?", "!", "…", '."', '?"', '!"', ".)", "?)", "!)")
 
-# TED y algunos canales meten el credito de transcripcion como primer cue
-# ("Traductor: Fulano / Revisor: Mengano"). Es ruido en el apunte.
+# TED and some channels put the transcription credit in the first cue
+# ("Translator: So-and-so / Reviewer: Someone"). It is noise in a note. The
+# Spanish spellings stay in the pattern on purpose: they match the source
+# video's language, which can be Spanish.
 CREDIT_RE = re.compile(
     r"^(?:(?:traductora?|translator|revisora?|reviewer|traducci[oó]n|"
     r"revisi[oó]n|subt[ií]tulos|transcri(?:ptor|ber|pci[oó]n))\s*:\s*"
     r"[^:]+?\s*)+$",
     re.IGNORECASE,
 )
-# Solo se descartan al principio: mas adelante un ":" parecido puede ser
-# contenido real.
+# Only dropped at the start: further in, a similar ":" can be real content.
 CREDIT_MAX_CUES = 3
 
 
 def parse_srt(text):
-    """Devuelve [(segundos_inicio, texto)] a partir del contenido de un SRT."""
+    """Return [(start_seconds, text)] from the contents of an SRT."""
     text = text.replace("\r\n", "\n").replace("﻿", "")
     cues = []
     for block in re.split(r"\n\s*\n", text.strip()):
@@ -73,9 +74,9 @@ def parse_srt(text):
 
 
 def merge_cues(cues):
-    """Pega los cues quitando el solape rodante.
+    """Join the cues, removing the rolling overlap.
 
-    Devuelve (palabras, anclas) donde anclas es [(indice_palabra, segundos)].
+    Returns (words, anchors) where anchors is [(word_index, seconds)].
     """
     words = []
     anchors = []
@@ -85,7 +86,7 @@ def merge_cues(cues):
         if not incoming:
             continue
 
-        # Solape mas largo entre la cola de lo acumulado y la cabeza de lo nuevo.
+        # Longest overlap between the accumulated tail and the incoming head.
         overlap = 0
         for n in range(min(len(words), len(incoming)), 0, -1):
             tail = [w.lower() for w in words[-n:]]
@@ -105,7 +106,7 @@ def merge_cues(cues):
 
 
 def anchor_for(index, anchors):
-    """Segundos del ancla vigente en una posicion dada."""
+    """Seconds of the anchor in effect at a given position."""
     seconds = 0
     for at, secs in anchors:
         if at > index:
@@ -115,7 +116,7 @@ def anchor_for(index, anchors):
 
 
 def build_paragraphs(words, anchors, target=110, slack=45):
-    """Agrupa en parrafos de ~target palabras, cortando en frontera de frase."""
+    """Group into paragraphs of ~target words, cutting on a sentence boundary."""
     paragraphs = []
     i = 0
     n = len(words)
@@ -124,7 +125,7 @@ def build_paragraphs(words, anchors, target=110, slack=45):
         end = min(i + target, n)
 
         if end < n:
-            # Busca el final de frase mas cercano dentro del margen.
+            # Look for the nearest sentence end within the slack.
             limit = min(end + slack, n)
             cut = None
             for j in range(end, limit):
@@ -151,34 +152,34 @@ def fmt_time(seconds):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="SRT -> texto plano con anclas de tiempo.")
-    ap.add_argument("srt", help="archivo .srt de entrada")
-    ap.add_argument("-o", "--output", help="archivo de salida (default: stdout)")
-    ap.add_argument("--header", help="texto a poner al inicio del archivo")
+    ap = argparse.ArgumentParser(description="SRT -> plain text with time anchors.")
+    ap.add_argument("srt", help="input .srt file")
+    ap.add_argument("-o", "--output", help="output file (default: stdout)")
+    ap.add_argument("--header", help="text to put at the start of the file")
     ap.add_argument(
         "--words",
         type=int,
         default=110,
-        help="palabras por parrafo, aproximado (default: 110)",
+        help="words per paragraph, approximate (default: 110)",
     )
     ap.add_argument(
         "--no-timestamps",
         action="store_true",
-        help="omite las anclas [mm:ss]",
+        help="omit the [mm:ss] anchors",
     )
     args = ap.parse_args()
 
     src = Path(args.srt)
     if not src.is_file():
-        sys.exit(f"srt2txt: no existe el archivo: {src}")
+        sys.exit(f"srt2txt: no such file: {src}")
 
     cues = parse_srt(src.read_text(encoding="utf-8", errors="replace"))
     if not cues:
-        sys.exit(f"srt2txt: no se encontro ningun cue valido en {src}")
+        sys.exit(f"srt2txt: found no valid cue in {src}")
 
     words, anchors = merge_cues(cues)
     if not words:
-        sys.exit(f"srt2txt: los cues de {src} quedaron vacios tras limpiar")
+        sys.exit(f"srt2txt: the cues in {src} were empty after cleaning")
 
     paragraphs = build_paragraphs(words, anchors, target=args.words)
 
@@ -193,7 +194,7 @@ def main():
     if args.output:
         Path(args.output).write_text(out, encoding="utf-8")
         print(
-            f"srt2txt: {len(words)} palabras, {len(paragraphs)} parrafos -> {args.output}",
+            f"srt2txt: {len(words)} words, {len(paragraphs)} paragraphs -> {args.output}",
             file=sys.stderr,
         )
     else:
