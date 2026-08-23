@@ -1,137 +1,161 @@
-# CLAUDE.md — yt-notes
+# CLAUDE.md: yt-notes
 
-Contexto para Claude Code. Leelo antes de tocar nada.
+Context for Claude Code. Read it before touching anything.
 
-## Que es
+## What this is
 
-Utilitario personal para convertir una charla de YouTube en un **apunte `.md` de
-conceptos** que sirva de banco de memoria: se lee meses despues, cuando ni el
-video ni la conversacion original se recuerdan, y se usa como contexto al
-trabajar en un tema relacionado.
+A personal utility that turns a YouTube talk into a **concept note in `.md`**
+that works as a memory bank: you read it months later, when neither the video
+nor the original conversation is remembered, and you paste it as context when
+working on a related subject.
 
-La transcripcion es plomeria, no el producto. **El producto es `notas/*.md`.**
+The transcript is plumbing, not the product. **The product is `notes/*.md`.**
 
-Uso frecuente y personal, no es un producto. Prioridad: que funcione sin
-friccion y sin dependencias pesadas. No es un proyecto de SEPHUS ni de LOOR.
+Used often and personally. It is not a product. Priority: it works without
+friction and without heavy dependencies. It is not a SEPHUS or LOOR project.
 
-## Como se usa
+## Language
 
-```
-/notes <url-de-youtube>
-```
+**The repo is in English.** Docs, comments, user-facing messages, commit
+messages, the skill, the template, and the notes themselves: all English.
 
-La skill (`.claude/skills/notes/`) corre `transcribe.sh`, lee la transcripcion y
-escribe el apunte. **El resumen lo hace Claude en sesion**, no un script ni una
-llamada a la API: no hay API key ni facturacion aparte, y se puede preguntar y
-corregir mientras se escribe.
+**Spanish is supported as a video language, not as a repo language.** Some
+Spanish stays in the code on purpose and must not be "cleaned up":
 
-## Entorno objetivo (unico)
+- `LANGS_FALLBACK="es,en"` in `transcribe.sh`.
+- The `ñ`/`Ñ` mapping in `slugify.py`.
+- The Spanish spellings in `CREDIT_RE` in `srt2txt.py`, which strip the
+  transcription credit from Spanish-language videos.
 
-- macOS 26.x, Apple Silicon (arm64). **No hay que soportar Intel ni Linux.**
-- `yt-dlp` y `ffmpeg` via Homebrew. `ffmpeg` no es opcional: YouTube sirve VTT y
-  la conversion a SRT pasa por el.
-- `python3`. Los scripts de Python son **solo stdlib**.
-- Shell: **bash 3.2**, el que trae macOS. Nada de `mapfile`, arreglos
-  asociativos ni `${var,,}`.
+A note about a Spanish talk is written in English, but **verbatim quotes stay
+in the speaker's language**, with a short English gloss when the wording is not
+obvious. A translated quote is no longer a quote, and the note has to stay
+verifiable against the timestamp.
 
-**Ojo con BSD:** `sed`, `tr` y `ls` son las versiones BSD. Por eso el slug se
-genera en `slugify.py` y no con `sed`/`tr`, y la seleccion de archivos usa
-arreglos con `nullglob` en vez de parsear `ls`.
-
-## Estructura
+## How it is used
 
 ```
-transcribe.sh              URL -> salida/<slug>.<lang>.srt + .txt
-srt2txt.py                 SRT -> parrafos con anclas [mm:ss]. Stdlib.
-slugify.py                 Titulo -> slug ASCII. Stdlib.
-prompts/notas.md           Plantilla del apunte.
-.claude/skills/notes/      La skill /notes.
-notas/                     EL PRODUCTO. Local, no versionado.
-salida/                    Transcripciones. Local, no versionado.
+/notes <youtube-url>
 ```
 
-Flujo de `transcribe.sh`:
+The skill (`.claude/skills/notes/`) runs `transcribe.sh`, reads the transcript
+and writes the note. **Claude writes the summary in session**, not a script and
+not an API call: no API key, no separate billing, and you can ask questions and
+correct things while it is being written.
 
-1. Lee metadata con `yt-dlp --print` (titulo, canal, duracion, fecha, URL,
-   idioma) y vuelca la descripcion a `<slug>.description` con
-   `--print-to-file`. Sin `--lang`, se pide **solo el idioma original** del
-   video, no una lista.
-2. Titulo -> slug via `slugify.py`.
-3. Revisa que quedo en `salida/` y, sin `--force`, lo reutiliza: primero el
-   `.srt`, y si no, un `.vtt` a medio procesar que convierte con ffmpeg.
-4. Baja subtitulos publicados (`--write-subs --write-auto-subs`) y los convierte
-   a SRT con `--convert-subs srt`. Si el idioma original no tiene subtitulos,
-   recien ahi reintenta con `es,en`.
-5. Elige el `.srt` segun el orden de preferencia de `--lang`.
-6. `srt2txt.py` -> `.txt` limpio con anclas de tiempo.
+## Target environment (the only one)
 
-Salidas: `.srt` (crudo) y `.txt` (parrafos con `[mm:ss]`). **Las anclas del
-`.txt` son de donde salen los timestamps del apunte** — son el enlace de vuelta
-a la fuente, no decoracion.
+- macOS 26.x, Apple Silicon (arm64). **Intel and Linux do not need support.**
+- `yt-dlp` and `ffmpeg` via Homebrew. `ffmpeg` is not optional: YouTube serves
+  VTT and the conversion to SRT goes through it.
+- `python3`. The Python scripts are **stdlib only**.
+- Shell: **bash 3.2**, the one macOS ships. No `mapfile`, no associative
+  arrays, no `${var,,}`.
 
-## Reglas
+**Watch out for BSD:** `sed`, `tr` and `ls` are the BSD versions. That is why
+the slug is generated in `slugify.py` and not with `sed`/`tr`, and why file
+selection uses arrays with `nullglob` instead of parsing `ls`.
 
-- `srt2txt.py` y `slugify.py` usan **solo stdlib**. No agregar dependencias.
-- No introducir servicios pagos ni llamadas de red fuera de yt-dlp.
-- El `.txt` lleva el idioma en el nombre a proposito: sin eso, correr el mismo
-  video en dos idiomas pisa el archivo anterior sin avisar.
-- En los apuntes, **nunca mezclar lo que dice el autor con la interpretacion
-  propia**. Lo propio va en la seccion "Notas propias".
-- Los timestamps no se inventan ni se aproximan. Se copian de las anclas.
-- **Ningun enlace sin abrir.** El material de respaldo va verificado o no va.
-  Un enlace inventado en un banco de memoria es peor que ninguno: se lee en
-  frio meses despues, cuando ya no hay como detectar el error.
-- `--print-to-file` **agrega**, no sobrescribe. Por eso la descripcion pasa por
-  un temporal nuevo en cada corrida y se mueve al final.
-- yt-dlp sale con codigo distinto de cero si falla **cualquiera** de los
-  idiomas pedidos, aunque los otros hayan bajado bien. Lo que decide es si
-  quedo un `.srt` usable, no el codigo de salida.
-- **Un idioma por corrida.** Cada idioma extra es una descarga mas y YouTube
-  devuelve 429 con facilidad. Por eso se pide el original a secas y la lista de
-  respaldo (`es,en`) solo entra si el original no tiene subtitulos. Como yt-dlp
-  reporta la variante regional (`es-US`) pero la pista suele llamarse `es`, se
-  piden ambas: es el mismo idioma y solo existe una de las dos.
-- **yt-dlp borra el `.vtt` al convertirlo a SRT**, así que un `.vtt` que
-  sobreviva en `salida/` significa que la descarga termino pero la conversion
-  no. Pasa cuando un 429 corta la corrida en medio. Convertirlo con ffmpeg es
-  local y gratis; volver a bajarlo cuesta otro 429.
-- Preferir el **idioma original del hablante** para el apunte. Los subtitulos
-  traducidos de YouTube pierden matiz justo en la terminologia. El script ya lo
-  hace solo; no lo pises con `--lang` sin razon.
-- **Las pistas auto-traducidas de YouTube se llaman `<destino>-<origen>`**, así
-  que `es-en` es "espanol desde ingles": en un video en espanol, una traduccion
-  de ida y vuelta. Por eso la busqueda de `.srt` matchea exacto y `-orig`, y
-  nunca `${lang}-*`. Las variantes regionales (`es-419`) se piden explicitas.
+## Layout
 
-## Estado
+```
+transcribe.sh              URL -> output/<slug>.<lang>.srt + .txt
+srt2txt.py                 SRT -> paragraphs with [mm:ss] anchors. Stdlib.
+slugify.py                 title -> ASCII slug. Stdlib.
+prompts/note-template.md   The note template.
+.claude/skills/notes/      The /notes skill.
+notes/                     THE PRODUCT. Local, untracked.
+output/                    Transcripts. Local, untracked.
+```
 
-Probado end-to-end contra YouTube real: charla TED de 14 min (subtitulos
-manuales en `es` y `en`) y podcast de 1 h en `es-US` con subtitulos
-automaticos. Cubre metadata, slug, descarga de un solo idioma, cache de `.srt`,
-recuperacion de un `.vtt` sin convertir, fallback de variante regional
-(`es-US` -> `es`), dedup de ventana rodante, anclas de tiempo y apunte final.
-`srt2txt.py` tambien probado contra un SRT sintetico con duplicados rodantes
-y etiquetas `<c>`. Errores de yt-dlp (video inexistente, privado, restringido, geobloqueado)
-traducidos a mensajes legibles; el de "no existe" verificado contra la red real.
+Flow of `transcribe.sh`:
 
-## Pendientes (en orden)
+1. Reads metadata with `yt-dlp --print` (title, channel, duration, date, URL,
+   language) and dumps the description to `<slug>.description` with
+   `--print-to-file`. Without `--lang`, it asks for **the video's original
+   language only**, not a list.
+2. Title -> slug via `slugify.py`.
+3. Checks what is already in `output/` and, without `--force`, reuses it: the
+   `.srt` first, and failing that a half-processed `.vtt` that it converts with
+   ffmpeg.
+4. Downloads published subtitles (`--write-subs --write-auto-subs`) and
+   converts them to SRT with `--convert-subs srt`. If the original language has
+   no subtitles, only then does it retry with `es,en`.
+5. Picks the `.srt` according to the order of preference from `--lang`.
+6. `srt2txt.py` -> clean `.txt` with time anchors.
 
-1. **ASR para videos sin subtitulos.** Hoy `--asr` sale con un error explicito.
-   La mayoria de charlas de gente con autoridad tienen subtitulos publicados,
-   así que esto vale la pena solo cuando aparezca un video real que lo necesite
-   — son ~1.6 GB de modelo y una dependencia pesada (`mlx-whisper` via pipx)
-   para un caso que todavia no se ha dado. **Si se implementa: los flags de
-   `mlx_whisper` NO estan verificados contra la version instalada; correr
-   `mlx_whisper --help` primero.**
+Outputs: `.srt` (raw) and `.txt` (paragraphs with `[mm:ss]`). **The anchors in
+the `.txt` are where the note's timestamps come from.** They are the link back
+to the source, not decoration.
 
-2. **Elegir idioma interactivamente.** Si se pide `--lang es` y solo hay
-   ingles, hoy avisa y usa lo que encuentre. Mejor: listar lo disponible y
-   dejar decidir antes de bajar.
+## Rules
 
-3. **Partir transcripciones largas.** Una clase de 1h entra en contexto sin
-   problema, pero si aparece algo de 3h+ va a hacer falta `--split N` cortando
-   en frontera de frase.
+- `srt2txt.py` and `slugify.py` are **stdlib only**. Do not add dependencies.
+- Do not introduce paid services or network calls outside yt-dlp.
+- The `.txt` carries the language in its name on purpose: without it, running
+  the same video in two languages overwrites the previous file with no warning.
+- In a note, **never mix what the speaker says with your own interpretation**.
+  Yours goes in the "Your own notes" section.
+- Timestamps are not invented or approximated. They are copied from the
+  anchors.
+- **No link goes in unopened.** Supporting material is verified or it is left
+  out. An invented link in a memory bank is worse than none: it gets read cold
+  months later, when there is no way left to catch the error.
+- `--print-to-file` **appends**, it does not overwrite. That is why the
+  description goes through a fresh temp file on every run and is moved at the
+  end.
+- yt-dlp exits non-zero if **any** of the requested languages fails, even when
+  the others downloaded fine. What decides is whether a usable `.srt` is on
+  disk, not the exit code.
+- **One language per run.** Every extra language is one more download and
+  YouTube returns 429 easily. That is why the original is requested on its own
+  and the fallback list (`es,en`) only comes in when the original has no
+  subtitles. Since yt-dlp reports the regional variant (`es-US`) but the track
+  is usually named `es`, both are requested: it is the same language and only
+  one of the two exists.
+- **yt-dlp deletes the `.vtt` when it converts it to SRT**, so a `.vtt` that
+  survives in `output/` means the download finished but the conversion did not.
+  It happens when a 429 cuts a run in half. Converting it with ffmpeg is local
+  and free; downloading it again costs another 429.
+- Prefer the **speaker's original language** for the note. YouTube's translated
+  subtitles lose nuance exactly in the terminology. The script already does
+  this on its own; do not override it with `--lang` without a reason.
+- **YouTube's auto-translated tracks are named `<target>-<source>`**, so `es-en`
+  is "Spanish from English": on a Spanish-language video, a round trip. That is
+  why the `.srt` search matches exactly and `-orig`, and never `${lang}-*`.
+  Regional variants (`es-419`) are requested explicitly.
+- An `[ ... ] && echo ...` as the last statement of a script makes it exit 1
+  whenever the test is false, because that is the status the AND-OR list leaves
+  behind. Use an `if` when the line is at the end.
 
-4. **Notas que se citen entre si.** Cuando haya varios apuntes del mismo tema,
-   enlazarlos con `[[wikilinks]]` para que se lean como un cuerpo y no como
-   archivos sueltos.
+## Status
+
+Tested end to end against real YouTube: a 14-minute TED talk (manual subtitles
+in `es` and `en`), a 1-hour podcast in `es-US` with auto-generated subtitles,
+and a 20-minute conference talk in `en-US`. Covers metadata, slug, single
+language download, `.srt` cache, recovery of an unconverted `.vtt`, regional
+variant fallback (`es-US` -> `es`), rolling-window dedup, time anchors and the
+final note. `srt2txt.py` is also tested against a synthetic SRT with rolling
+duplicates and `<c>` tags. yt-dlp errors (missing, private, restricted,
+geo-blocked video) are translated into readable messages; the "does not exist"
+one is verified against the real network.
+
+## Open items (in order)
+
+1. **ASR for videos without subtitles.** Today `--asr` exits with an explicit
+   error. Most talks by people with real authority have published subtitles, so
+   this only pays off when a real video needs it: it is ~1.6 GB of model and a
+   heavy dependency (`mlx-whisper` via pipx) for a case that has not come up.
+   **If it gets implemented: the `mlx_whisper` flags are NOT verified against
+   the installed version; run `mlx_whisper --help` first.**
+
+2. **Pick the language interactively.** If you ask for `--lang es` and only
+   English exists, today it warns and uses whatever it finds. Better: list what
+   is available and let the user decide before downloading.
+
+3. **Split long transcripts.** A 1-hour class fits in context without trouble,
+   but something 3h+ will need `--split N`, cutting on a sentence boundary.
+
+4. **Notes that cite each other.** Once there are several notes on the same
+   subject, link them with `[[wikilinks]]` so they read as one body and not as
+   loose files.

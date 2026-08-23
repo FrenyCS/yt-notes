@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 #
-# transcribe.sh — URL de YouTube -> .srt + .txt listos para hacer apuntes.
+# transcribe.sh: YouTube URL -> .srt + .txt ready for note-taking.
 #
-# Usa los subtitulos publicados del video (manuales o automaticos). No hace ASR:
-# ver la nota sobre --asr en CLAUDE.md.
+# Uses the video's published subtitles (manual or auto-generated). It does no
+# ASR: see the note about --asr in CLAUDE.md.
 #
-# Escrito para bash 3.2, que es el que trae macOS: nada de mapfile, arreglos
-# asociativos ni ${var,,}.
+# Written for bash 3.2, the one macOS ships: no mapfile, no associative arrays,
+# no ${var,,}.
 
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUTDIR="${HERE}/salida"
+OUTDIR="${HERE}/output"
 
-# Respaldo para cuando el idioma original no tiene subtitulos publicados, o
-# cuando yt-dlp no reporta idioma. No se pide junto con el original: cada
-# idioma extra es una peticion mas a YouTube.
+# Fallback for when the original language has no published subtitles, or when
+# yt-dlp reports no language at all. It is not requested alongside the original:
+# every extra language is one more request to YouTube.
 LANGS_FALLBACK="es,en"
 LANGS="$LANGS_FALLBACK"
 LANGS_EXPLICIT=0
@@ -25,85 +25,85 @@ URL=""
 
 usage() {
   cat <<'EOF'
-Uso: transcribe.sh <url-de-youtube> [opciones]
+Usage: transcribe.sh <youtube-url> [options]
 
-Opciones:
-  --lang LANGS   Idiomas de subtitulos, por orden de preferencia.
-                 Por defecto se usa el idioma original del video, que es lo
-                 que casi siempre se quiere: las pistas traducidas de YouTube
-                 pierden matiz en la terminologia.
-                 Ej: --lang "en" o --lang "es,es-419,en"
-  --list         Solo lista los subtitulos disponibles y sale.
-  --force        Vuelve a descargar aunque ya haya subtitulos en salida/.
-  -h, --help     Esto.
+Options:
+  --lang LANGS   Subtitle languages, in order of preference.
+                 The default is the video's original language, which is almost
+                 always what you want: YouTube's translated tracks lose nuance
+                 exactly in the terminology.
+                 E.g. --lang "en" or --lang "es,es-419,en"
+  --list         List the available subtitles and exit.
+  --force        Download again even if subtitles already exist in output/.
+  -h, --help     This.
 
-Salidas (en salida/):
-  <slug>.<lang>.srt   Con timestamps, para saltar al minuto exacto.
-  <slug>.<lang>.txt   Limpio, en parrafos, con anclas [mm:ss].
+Outputs (in output/):
+  <slug>.<lang>.srt   With timestamps, to jump to the exact minute.
+  <slug>.<lang>.txt   Clean, in paragraphs, with [mm:ss] anchors.
 EOF
 }
 
 die() { echo "error: $*" >&2; exit 1; }
 
-# --- argumentos ---------------------------------------------------------------
+# --- arguments ----------------------------------------------------------------
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --lang)   [ $# -ge 2 ] || die "--lang necesita un valor"; LANGS="$2"; LANGS_EXPLICIT=1; shift 2 ;;
+    --lang)   [ $# -ge 2 ] || die "--lang needs a value"; LANGS="$2"; LANGS_EXPLICIT=1; shift 2 ;;
     --lang=*) LANGS="${1#*=}"; LANGS_EXPLICIT=1; shift ;;
     --list)   LIST_ONLY=1; shift ;;
     --force)  FORCE=1; shift ;;
     --asr)
-      die "--asr no esta implementado todavia (ver CLAUDE.md). Este script solo usa subtitulos publicados."
+      die "--asr is not implemented yet (see CLAUDE.md). This script only uses published subtitles."
       ;;
     -h|--help) usage; exit 0 ;;
-    -*)       die "opcion desconocida: $1" ;;
+    -*)       die "unknown option: $1" ;;
     *)
-      [ -z "$URL" ] || die "se recibio mas de una URL: '$URL' y '$1'"
+      [ -z "$URL" ] || die "got more than one URL: '$URL' and '$1'"
       URL="$1"; shift ;;
   esac
 done
 
 [ -n "$URL" ] || { usage; exit 1; }
 
-# --- dependencias -------------------------------------------------------------
+# --- dependencies -------------------------------------------------------------
 
 for bin in yt-dlp ffmpeg python3; do
-  command -v "$bin" >/dev/null 2>&1 || die "falta '$bin' en el PATH."
+  command -v "$bin" >/dev/null 2>&1 || die "'$bin' is missing from PATH."
 done
 
 # --- metadata -----------------------------------------------------------------
 
-# Traduce los fallos tipicos de yt-dlp a algo legible.
+# Turns the usual yt-dlp failures into something readable.
 explain_ytdlp_error() {
   local log="$1"
   if grep -qi "private video" "$log"; then
-    echo "El video es privado."
+    echo "The video is private."
   elif grep -qi "sign in to confirm your age\|age-restricted\|inappropriate for some users" "$log"; then
-    echo "El video tiene restriccion de edad; yt-dlp necesita cookies de una sesion con login."
+    echo "The video is age-restricted; yt-dlp needs cookies from a logged-in session."
   elif grep -qi "not available in your country\|geo restricted\|geo-restricted" "$log"; then
-    echo "El video esta bloqueado en tu region."
+    echo "The video is blocked in your region."
   elif grep -qi "video unavailable\|has been removed\|does not exist" "$log"; then
-    echo "El video no existe o fue eliminado."
+    echo "The video does not exist or was removed."
   elif grep -qi "members-only\|join this channel" "$log"; then
-    echo "El video es solo para miembros del canal."
+    echo "The video is for channel members only."
   elif grep -qi "429\|too many requests" "$log"; then
-    echo "YouTube esta limitando las peticiones (429). Espera unos minutos y reintenta: lo que alcanzo a bajar se reutiliza sin volver a pedirlo."
+    echo "YouTube is rate-limiting (429). Wait a few minutes and retry: whatever downloaded is reused without asking for it again."
   elif grep -qi "unable to download\|unable to extract\|HTTP Error" "$log"; then
-    echo "yt-dlp no pudo acceder al video (red, o YouTube cambio algo y toca 'brew upgrade yt-dlp')."
+    echo "yt-dlp could not reach the video (network, or YouTube changed something and it is time to 'brew upgrade yt-dlp')."
   else
     return 1
   fi
 }
 
-# Sale por stderr para no ensuciar la salida capturada.
+# Goes to stderr so it does not pollute captured output.
 ytdlp_failed() {
   local log="$1" what="$2"
   local reason
   if reason="$(explain_ytdlp_error "$log")"; then
     echo "error: $reason" >&2
   else
-    echo "error: yt-dlp fallo al $what. Salida cruda:" >&2
+    echo "error: yt-dlp failed to $what. Raw output:" >&2
     tail -n 15 "$log" >&2
   fi
   exit 1
@@ -113,17 +113,17 @@ TMPLOG="$(mktemp -t yt-notes)"
 trap 'rm -f "$TMPLOG"' EXIT
 
 if [ "$LIST_ONLY" -eq 1 ]; then
-  echo "Subtitulos disponibles:"
-  yt-dlp --list-subs --skip-download "$URL" 2>"$TMPLOG" || ytdlp_failed "$TMPLOG" "listar subtitulos"
+  echo "Available subtitles:"
+  yt-dlp --list-subs --skip-download "$URL" 2>"$TMPLOG" || ytdlp_failed "$TMPLOG" "list the subtitles"
   exit 0
 fi
 
-echo "Consultando metadata..."
+echo "Reading metadata..."
 
-# La descripcion va a un archivo aparte porque es multilinea y romperia el
-# parseo por linea de --print. Ojo: --print-to-file *agrega*, no sobrescribe,
-# y el destino final depende del slug que sale de esta misma llamada; por eso
-# pasa por un temporal vacio y se mueve despues.
+# The description goes to its own file because it is multiline and would break
+# the line-by-line parsing of --print. Careful: --print-to-file *appends*, it
+# does not overwrite, and the final destination depends on the slug that comes
+# out of this same call; hence a fresh temp file that gets moved afterwards.
 TMPDESC="$(mktemp -t yt-notes-desc)"
 trap 'rm -f "$TMPLOG" "$TMPDESC"' EXIT
 
@@ -135,7 +135,7 @@ META="$(yt-dlp --no-warnings --skip-download \
           --print "%(webpage_url)s" \
           --print "%(language)s" \
           --print-to-file "%(description)s" "$TMPDESC" \
-          "$URL" 2>"$TMPLOG")" || ytdlp_failed "$TMPLOG" "leer la metadata"
+          "$URL" 2>"$TMPLOG")" || ytdlp_failed "$TMPLOG" "read the metadata"
 
 TITLE="$(printf '%s\n' "$META"  | awk 'NR==1')"
 CHANNEL="$(printf '%s\n' "$META" | awk 'NR==2')"
@@ -144,20 +144,21 @@ UPLOADED="$(printf '%s\n' "$META" | awk 'NR==4')"
 PAGE_URL="$(printf '%s\n' "$META" | awk 'NR==5')"
 LANGUAGE="$(printf '%s\n' "$META" | awk 'NR==6')"
 
-[ -n "$TITLE" ] || die "yt-dlp no devolvio titulo; la URL puede no ser un video."
+[ -n "$TITLE" ] || die "yt-dlp returned no title; the URL may not be a video."
 
-# Si no se pidio idioma explicito, el original del video va primero. Para un
-# apunte importa la terminologia exacta de quien habla, y los subtitulos
-# traducidos de YouTube la pierden justo ahi.
+# With no explicit language, the video's original goes first. A note lives on
+# the exact terminology of whoever is speaking, and YouTube's translated
+# subtitles lose it precisely there.
 if [ "$LANGS_EXPLICIT" -eq 0 ] && [ -n "$LANGUAGE" ] && [ "$LANGUAGE" != "NA" ]; then
   LANGS="$LANGUAGE"
-  # yt-dlp reporta la variante regional ("es-US") pero la pista de subtitulos
-  # suele llamarse a secas ("es"), así que se piden las dos. Sigue siendo un
-  # solo idioma: no hay video con las dos publicadas, baja la que exista.
+  # yt-dlp reports the regional variant ("es-US") but the subtitle track is
+  # usually named plainly ("es"), so both get requested. It is still a single
+  # language: no video publishes both, so whichever exists is the one that
+  # downloads.
   case "$LANGUAGE" in
     *-*) LANGS="${LANGUAGE},${LANGUAGE%%-*}" ;;
   esac
-  echo "  idioma original: $LANGUAGE"
+  echo "  original language: $LANGUAGE"
 fi
 
 SLUG="$(python3 "${HERE}/slugify.py" "$TITLE")"
@@ -169,8 +170,8 @@ echo "  slug: $SLUG"
 
 mkdir -p "$OUTDIR"
 
-# La descripcion es donde el autor suele dejar el repo, las slides y el blog:
-# la fuente de material relacionado con mejor rendimiento y sin costo extra.
+# The description is where the author usually leaves the repo, the slides and
+# the blog: the highest-yield source of supporting material, at no extra cost.
 DESC="${BASE}.description"
 if [ -s "$TMPDESC" ]; then
   mv "$TMPDESC" "$DESC"
@@ -179,19 +180,19 @@ else
   DESC=""
 fi
 
-# --- subtitulos ---------------------------------------------------------------
+# --- subtitles ----------------------------------------------------------------
 
-# Primer subtitulo con extension $1 que exista siguiendo el orden de
-# preferencia de --lang.
-# Se usa un arreglo con nullglob: un glob sin match da un arreglo vacio en vez
-# de quedarse con el patron literal.
-# Segundo argumento: "strict" solo acepta los idiomas pedidos; "loose" acepta
-# cualquier subtitulo del video como ultimo recurso.
+# First subtitle with extension $1 that exists, following the order of
+# preference given by --lang.
+# It uses an array with nullglob: a glob with no match yields an empty array
+# instead of keeping the literal pattern.
+# Second argument: "strict" only accepts the requested languages; "loose"
+# accepts any subtitle of the video as a last resort.
 #
-# La distincion importa: al revisar el cache hay que ser estricto, porque si no
-# un .srt de una corrida anterior en otro idioma hace que --lang deje de tener
-# efecto sin avisar. Despues de bajar si conviene ser flexible, porque YouTube
-# devuelve variantes como "en-orig" que no coinciden literal con lo pedido.
+# The distinction matters: checking the cache has to be strict, otherwise a
+# .srt left by an earlier run in another language silently makes --lang stop
+# having any effect. After downloading it pays to be flexible, because YouTube
+# returns variants like "en-orig" that do not match the request literally.
 find_sub() {
   local ext="$1" mode="$2" lang candidate
   local old_nullglob
@@ -201,11 +202,11 @@ find_sub() {
   local found=""
   local IFS=,
   for lang in $LANGS; do
-    # Exacto y "-orig" nada mas. Un glob "${lang}-*" seria una trampa: YouTube
-    # nombra las pistas auto-traducidas "<destino>-<origen>", así que "es-*"
-    # tambien matchea es-en ("espanol desde ingles"), que en un video en
-    # espanol es una traduccion de ida y vuelta. Las variantes regionales
-    # (es-419, pt-BR) se piden explicitas con --lang.
+    # Exact match and "-orig", nothing else. A "${lang}-*" glob would be a
+    # trap: YouTube names auto-translated tracks "<target>-<source>", so "es-*"
+    # also matches es-en ("Spanish from English"), which on a Spanish video is
+    # a round trip through another language. Regional variants (es-419, pt-BR)
+    # are requested explicitly with --lang.
     for candidate in "${BASE}.${lang}.${ext}" "${BASE}.${lang}-orig.${ext}"; do
       [ -f "$candidate" ] || continue
       found="$candidate"
@@ -223,7 +224,7 @@ find_sub() {
   [ -n "$found" ] && printf '%s\n' "$found"
 }
 
-# ffmpeg hace localmente lo mismo que --convert-subs, sin tocar la red.
+# ffmpeg does locally what --convert-subs does, without touching the network.
 vtt_to_srt() {
   local vtt="$1" srt="${1%.vtt}.srt"
   ffmpeg -v error -y -i "$vtt" "$srt" </dev/null >/dev/null 2>&1 || return 1
@@ -231,8 +232,8 @@ vtt_to_srt() {
   printf '%s\n' "$srt"
 }
 
-# El .srt que haya en disco, convirtiendo un .vtt si hace falta. Silenciosa:
-# quien llama sabe si el archivo venia de una corrida anterior o de recien.
+# Whatever .srt is on disk, converting a .vtt if needed. Silent on purpose: the
+# caller knows whether the file came from an earlier run or from just now.
 resolve_srt() {
   local mode="$1" srt vtt
   srt="$(find_sub srt "$mode" || true)"
@@ -243,10 +244,10 @@ resolve_srt() {
   [ -n "$srt" ] && printf '%s\n' "$srt"
 }
 
-# Una pasada de descarga para los idiomas que tenga $LANGS. Deja el resultado
-# en $SRT (vacio si no salio nada) y en $DOWNLOAD_FAILED el codigo de yt-dlp.
+# One download pass for whatever languages $LANGS holds. Leaves the result in
+# $SRT (empty if nothing came out) and yt-dlp's status in $DOWNLOAD_FAILED.
 download_subs() {
-  echo "Bajando subtitulos ($LANGS)..."
+  echo "Downloading subtitles ($LANGS)..."
   DOWNLOAD_FAILED=0
   yt-dlp --no-warnings --skip-download \
          --write-subs --write-auto-subs \
@@ -259,24 +260,25 @@ download_subs() {
   SRT="$(resolve_srt strict || true)"
 }
 
-# Antes de pedir nada, ver que quedo de corridas anteriores. Ademas del .srt,
-# hay que mirar si sobrevivio un .vtt: yt-dlp lo borra al convertirlo, así que
-# uno en disco significa que la descarga termino pero la conversion no. Pasa de
-# verdad cuando un 429 corta la corrida justo en medio, y sin esto la corrida
-# siguiente vuelve a bajar medio mega para nada y se gana otro 429.
+# Before requesting anything, see what earlier runs left behind. Besides the
+# .srt, it is worth looking for a surviving .vtt: yt-dlp deletes it on
+# conversion, so one still on disk means the download finished but the
+# conversion did not. This really happens when a 429 cuts a run in half, and
+# without this the next run downloads half a megabyte for nothing and earns
+# another 429.
 SRT=""
 if [ "$FORCE" -eq 0 ]; then
   SRT="$(find_sub srt strict || true)"
   if [ -n "$SRT" ]; then
-    echo "Ya existe $(basename "$SRT") — reutilizando (usa --force para bajarlo de nuevo)."
+    echo "$(basename "$SRT") already exists: reusing it (use --force to download it again)."
   else
     CACHED_VTT="$(find_sub vtt strict || true)"
     if [ -n "$CACHED_VTT" ]; then
       SRT="$(vtt_to_srt "$CACHED_VTT" || true)"
       if [ -n "$SRT" ]; then
-        echo "Ya estaba $(basename "$CACHED_VTT") a medio procesar: convirtiendo sin volver a descargar."
+        echo "$(basename "$CACHED_VTT") was left half-processed: converting without downloading again."
       else
-        echo "aviso: $(basename "$CACHED_VTT") esta en disco pero ffmpeg no pudo convertirlo; se baja de nuevo." >&2
+        echo "warning: $(basename "$CACHED_VTT") is on disk but ffmpeg could not convert it; downloading again." >&2
       fi
     fi
   fi
@@ -285,69 +287,80 @@ fi
 if [ -z "$SRT" ]; then
   download_subs
 
-  # Se pidio un solo idioma, el original del video. Si ese no tiene subtitulos
-  # publicados, recien aca se gasta una peticion mas con la lista de respaldo:
-  # pedirlos todos de entrada es lo que dispara los 429.
+  # A single language was requested, the video's original. Only if that one has
+  # no published subtitles is one more request spent on the fallback list:
+  # asking for all of them up front is what triggers the 429s.
   if [ -z "$SRT" ] && [ "$LANGS_EXPLICIT" -eq 0 ] && [ "$LANGS" != "$LANGS_FALLBACK" ]; then
-    echo "aviso: el video no tiene subtitulos en '$LANGS'; probando con $LANGS_FALLBACK." >&2
+    echo "warning: the video has no subtitles in '$LANGS'; trying $LANGS_FALLBACK." >&2
     LANGS="$LANGS_FALLBACK"
     download_subs
   fi
 
   if [ -z "$SRT" ]; then
     SRT="$(resolve_srt loose || true)"
-    [ -n "$SRT" ] && echo "aviso: no habia subtitulos en '$LANGS'; usando $(basename "$SRT") en su lugar." >&2
+    [ -n "$SRT" ] && echo "warning: there were no subtitles in '$LANGS'; using $(basename "$SRT") instead." >&2
   fi
 
-  # yt-dlp sale con codigo distinto de cero si falla *cualquiera* de los
-  # idiomas pedidos, aunque los demas hayan bajado bien. Lo que importa es si
-  # quedo un .srt usable, no el codigo de salida.
+  # yt-dlp exits non-zero if *any* of the requested languages fails, even when
+  # the others downloaded fine. What matters is whether a usable .srt is on
+  # disk, not the exit code.
   if [ "$DOWNLOAD_FAILED" -eq 1 ]; then
     if [ -z "$SRT" ]; then
-      ytdlp_failed "$TMPLOG" "bajar los subtitulos"
+      ytdlp_failed "$TMPLOG" "download the subtitles"
     fi
-    echo "aviso: yt-dlp fallo en alguno de los idiomas pedidos, pero se obtuvo $(basename "$SRT")." >&2
+    echo "warning: yt-dlp failed on one of the requested languages, but $(basename "$SRT") came through." >&2
     reason="$(explain_ytdlp_error "$TMPLOG" || true)"
     [ -n "$reason" ] && echo "       $reason" >&2
   fi
 fi
 
 if [ -z "$SRT" ]; then
-  echo "error: el video no tiene subtitulos en ninguno de estos idiomas: $LANGS" >&2
+  echo "error: the video has no subtitles in any of these languages: $LANGS" >&2
   echo >&2
-  echo "Mira que hay disponible con:" >&2
+  echo "See what is available with:" >&2
   echo "  $0 \"$URL\" --list" >&2
   exit 1
 fi
 
-# --- texto plano --------------------------------------------------------------
+# --- plain text ---------------------------------------------------------------
 
-# El .txt lleva el idioma en el nombre: si no, correr el mismo video en dos
-# idiomas pisa el archivo anterior sin avisar.
+# The .txt carries the language in its name: without it, running the same video
+# in two languages overwrites the previous file with no warning.
 SRT_NAME="$(basename "$SRT")"
 SRT_LANG="${SRT_NAME#${SLUG}.}"
 SRT_LANG="${SRT_LANG%.srt}"
 TXT="${BASE}.${SRT_LANG}.txt"
 
 HEADER="# ${TITLE}
-Canal: ${CHANNEL}
-Duracion: ${DURATION:-?}
-Publicado: ${UPLOADED:-?}
-Subtitulos: ${SRT_LANG}
+Channel: ${CHANNEL}
+Duration: ${DURATION:-?}
+Published: ${UPLOADED:-?}
+Subtitles: ${SRT_LANG}
 URL: ${PAGE_URL:-$URL}
 "
 
 python3 "${HERE}/srt2txt.py" "$SRT" --output "$TXT" --header "$HEADER"
 
 echo
-echo "Listo:"
+echo "Done:"
 echo "  srt: $SRT"
 echo "  txt: $TXT"
 if [ -n "$DESC" ]; then
   echo "  desc: $DESC"
-  # grep -c imprime 0 y ademas sale con codigo 1 cuando no hay coincidencias,
-  # asi que un `|| echo 0` duplicaria el conteo. wc -l cuenta y nunca falla.
-  # Con -o interesan las ocurrencias, no las lineas que las contienen.
-  links="$(grep -oE 'https?://[^[:space:]]+' "$DESC" 2>/dev/null | wc -l | tr -d ' ')"
-  [ "$links" -gt 0 ] && echo "        ($links enlaces — revisa si hay repo, slides o blog)"
+  # A description with no links is normal, and neither of the two ways this can
+  # go wrong may take the script down with it:
+  #   - grep exits 1 when it matches nothing, and pipefail hands that to the
+  #     command substitution, so the assignment needs its own fallback. (Using
+  #     `grep -c` instead does not help: it prints 0 *and* exits 1, so an
+  #     `|| echo 0` inside the substitution would yield "0\n0".)
+  #   - an `[ ... ] && echo` as the last statement of the script would make it
+  #     exit 1 whenever the test is false, because that is the status the AND-OR
+  #     list leaves behind. Hence the `if`.
+  # -o counts occurrences rather than the lines containing them, which is what
+  # the number is meant to report.
+  links="$(grep -oE 'https?://[^[:space:]]+' "$DESC" 2>/dev/null | wc -l | tr -d ' ')" || links=0
+  if [ "$links" -gt 0 ]; then
+    [ "$links" -eq 1 ] && noun="link" || noun="links"
+    echo "        ($links $noun: check for a repo, slides or a blog)"
+  fi
 fi
