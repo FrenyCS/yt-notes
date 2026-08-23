@@ -3,7 +3,7 @@ name: notes
 description: Convierte un video de YouTube en un apunte .md de conceptos con timestamps, guardado en notas/. Usar cuando el usuario pasa una URL de YouTube y quiere apuntes, resumen, conceptos o "pasar esto a memoria".
 ---
 
-# /notes — video de YouTube a apunte de conceptos
+# /notes: video de YouTube a apunte de conceptos
 
 Objetivo: dejar un `.md` que sirva de banco de memoria meses despues, cuando ni
 el video ni esta conversacion se recuerden. El apunte se lee en frio.
@@ -35,7 +35,7 @@ elegirlas solo; si pasas `--lang` explicito, no las pidas.
 ### 2. Leer la transcripcion completa
 
 Lee el `.txt` entero antes de escribir nada. Los parrafos vienen con anclas
-`[mm:ss]` — de ahi salen los timestamps del apunte.
+`[mm:ss]`: de ahi salen los timestamps del apunte.
 
 No resumas mientras lees. Primero entiende el argumento completo: muchas
 charlas ponen la tesis real al final, no al principio.
@@ -96,7 +96,9 @@ Usa el mismo slug del `.txt`. Plantilla en `prompts/notas.md`.
 
 ## Al terminar
 
-1. Agrega una linea a `notas/README.md`: `- [Titulo](slug.md) — gancho de una linea`
+1. Agrega una linea a `notas/README.md`: `- [Titulo](slug.md): gancho de una linea`.
+   El gancho arranca con el contenido, no con "Autor:", que dejaria dos puntos
+   dobles en la misma linea.
 2. Dile al usuario la ruta y resume en 2-3 lineas que se capturo.
 
 Nada de esto se versiona: el repo es la herramienta, no los apuntes. El `.txt` y
