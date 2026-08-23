@@ -345,6 +345,9 @@ echo "  srt: $SRT"
 echo "  txt: $TXT"
 if [ -n "$DESC" ]; then
   echo "  desc: $DESC"
-  links="$(grep -coE 'https?://[^[:space:]]+' "$DESC" 2>/dev/null || echo 0)"
+  # grep -c imprime 0 y ademas sale con codigo 1 cuando no hay coincidencias,
+  # asi que un `|| echo 0` duplicaria el conteo. wc -l cuenta y nunca falla.
+  # Con -o interesan las ocurrencias, no las lineas que las contienen.
+  links="$(grep -oE 'https?://[^[:space:]]+' "$DESC" 2>/dev/null | wc -l | tr -d ' ')"
   [ "$links" -gt 0 ] && echo "        ($links enlaces — revisa si hay repo, slides o blog)"
 fi
