@@ -72,10 +72,12 @@ to current work, what it clashes with, what to try.
 
 ## Rules
 
-- The note is written in **English**, whatever the language of the video.
-- **Verbatim quotes stay in the speaker's language.** A translated quote is no
-  longer a quote, and the note has to stay verifiable against the timestamp.
-  Add a short English gloss right after when the wording is not obvious.
+- The note is written in **the video's original language**, unless the user
+  asks for another one.
+- **Verbatim quotes stay in the speaker's language**, always. A translated quote
+  is no longer a quote, and the note has to stay verifiable against the
+  timestamp. When the note is in a different language from the video, add a
+  short gloss right after the quote when the wording is not obvious.
 - Timestamps come from the `[mm:ss]` anchors in the `.txt`. They are not
   invented or approximated: they are the link back to the source, and if they
   are wrong the note stops being verifiable.

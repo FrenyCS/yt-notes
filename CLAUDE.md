@@ -17,7 +17,14 @@ friction and without heavy dependencies. It is not a SEPHUS or LOOR project.
 ## Language
 
 **The repo is in English.** Docs, comments, user-facing messages, commit
-messages, the skill, the template, and the notes themselves: all English.
+messages, the skill and the template: all English.
+
+**The notes are the exception: a note is written in the video's original
+language.** A talk in Spanish gets a note in Spanish, one in English gets a note
+in English. The reason is fidelity: the note is built out of the speaker's own
+words and has to stay verifiable against the timestamps, and every sentence
+translated on the way in is one more place to lose the terminology. Ask for
+another language and you get it, but that is the override, not the default.
 
 **Spanish is supported as a video language, not as a repo language.** Some
 Spanish stays in the code on purpose and must not be "cleaned up":
@@ -27,10 +34,11 @@ Spanish stays in the code on purpose and must not be "cleaned up":
 - The Spanish spellings in `CREDIT_RE` in `srt2txt.py`, which strip the
   transcription credit from Spanish-language videos.
 
-A note about a Spanish talk is written in English, but **verbatim quotes stay
-in the speaker's language**, with a short English gloss when the wording is not
-obvious. A translated quote is no longer a quote, and the note has to stay
-verifiable against the timestamp.
+**Verbatim quotes always stay in the speaker's language**, even when the note
+is written in another one because that is what was asked for. A translated quote
+is no longer a quote, and the note has to stay verifiable against the timestamp.
+When the note and the video are in different languages, add a short gloss after
+the quote if the wording is not obvious.
 
 ## How it is used
 
