@@ -20,7 +20,7 @@ time.
 | What | Default | How to change it |
 |---|---|---|
 | Subtitles | the video's original language, detected automatically | ask for another language, or `--list` to see what exists |
-| Note language | English, whatever the language of the video | ask for another one |
+| Note language | the video's original language | ask for another one |
 | Supporting material | searched for, every link verified | skip it if you are in a hurry |
 | Scope | full note, following the template | shorter, or focused on one topic |
 | Destination | `notes/<slug>.md`, local and untracked | another path |
@@ -106,11 +106,14 @@ being repeated.
 
 Use the same slug as the `.txt`. Template in `prompts/note-template.md`.
 
-**The note is written in English**, whatever the language of the video, unless
-the user asks otherwise. The exception is verbatim quotes: those stay in the
-speaker's language, with a short English gloss when the wording is not obvious.
-A translated quote is no longer a quote, and the note has to stay verifiable
-against the timestamp.
+**The note is written in the video's original language**, unless the user asks
+otherwise. A Spanish talk gets a Spanish note. The reason is fidelity: the note
+is built out of the speaker's own words and has to stay verifiable against the
+timestamps, and translating on the way in loses the terminology.
+
+Verbatim quotes stay in the speaker's language in every case, including when the
+user did ask for another language. A translated quote is no longer a quote. In
+that case add a short gloss after the quote when the wording is not obvious.
 
 ## What makes a note good
 
