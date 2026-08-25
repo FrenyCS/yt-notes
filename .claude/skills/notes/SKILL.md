@@ -135,9 +135,15 @@ that case add a short gloss after the quote when the wording is not obvious.
 
 ## When you are done
 
-1. Add a line to `notes/README.md`: `- [Title](slug.md): one-line hook`. The
-   hook starts with the content, not with "Author:", which would leave two
-   colons on the same line.
+1. Add a line to `notes/README.md`, under the speaker's `## Name (\`slug/\`)`
+   heading (create the heading, alphabetically placed, if this is their first
+   note): `- [Title](slug/file.md): one-line hook`. The hook starts with the
+   content, not with "Author:", which would leave two colons on the same line.
+   Right below the heading keep a single `**Tags:** topic, topic, topic` line
+   with that speaker's main topics across all their notes (same language as
+   the note's own `Topics`/`Temas` field). Update it, don't append to it: pull
+   from the `Topics`/`Temas` line of every note under that heading, keep only
+   the 3-5 that are actually recurring or central, drop the rest.
 2. Tell the user the path and sum up in 2-3 lines what got captured.
 3. Also say what came out below useful: auto-generated subtitles that wrecked
    the figures, supporting material that never turned up, attributions that did
