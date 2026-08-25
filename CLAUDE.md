@@ -140,14 +140,71 @@ duplicates and `<c>` tags. yt-dlp errors (missing, private, restricted,
 geo-blocked video) are translated into readable messages; the "does not exist"
 one is verified against the real network.
 
+The "no subtitles at all" path has now been hit by a real video: the script
+reports it correctly and stops, which is the right behaviour. Getting a note out
+of that one meant transcribing it by hand; see open item 1 for what that costs
+and which engine to use.
+
 ## Open items (in order)
 
-1. **ASR for videos without subtitles.** Today `--asr` exits with an explicit
-   error. Most talks by people with real authority have published subtitles, so
-   this only pays off when a real video needs it: it is ~1.6 GB of model and a
-   heavy dependency (`mlx-whisper` via pipx) for a case that has not come up.
-   **If it gets implemented: the `mlx_whisper` flags are NOT verified against
-   the installed version; run `mlx_whisper --help` first.**
+1. **ASR for videos without subtitles.** Today `--asr` still exits with an
+   explicit error, and it stays that way for now: one video in several months
+   has needed it, which does not justify making the dependency mandatory. But
+   the case did come up (a 1:20 masterclass with no published subtitles at all,
+   neither manual nor automatic), the whole path was run by hand end to end, and
+   what follows is what it actually costs. Nothing here is guesswork any more.
+
+   **Use `whisper.cpp`, not `mlx-whisper`.** Both were measured on the same
+   80-minute Spanish audio with the same model (`large-v3-turbo`, ~1.6 GB):
+
+   - `brew install whisper-cpp` is bottled and installs like `yt-dlp` and
+     `ffmpeg`. `mlx-whisper` needs pipx and its own Python venv, and the install
+     failed once on a PyPI read timeout.
+   - `whisper.cpp` took 10:49 against mlx's 7:33 on an M2 with 8 GB. Those three
+     minutes do not pay for a second dependency chain.
+   - `whisper.cpp` got proper names right at least as often in every case
+     checked, and never produced the garbage mlx did ("AXS Studio" for Ask
+     Studio, "Chachi PT" for ChatGPT). Both mangle Hormozi and Gadzhi, so those
+     get fixed by hand either way.
+   - `srt2txt.py` reads the `whisper.cpp` SRT with **no changes at all**.
+
+   The model is not in Homebrew. Download it once from
+   `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin`
+
+   Feed it 16 kHz mono WAV
+   (`ffmpeg -i in.mp3 -ar 16000 -ac 1 -c:a pcm_s16le out.wav`), then:
+
+   ```
+   whisper-cli -m ggml-large-v3-turbo.bin -f audio16k.wav \
+               -l es -osrt -of "<slug>.es"
+   ```
+
+   `-of` appends the extension instead of replacing it, so the language tag
+   survives, which is what the `.txt` naming rule needs.
+
+   **Two traps, both in `mlx-whisper`, recorded so nobody pays for them twice.**
+   Its CLI overrides `transcribe()`'s default temperature tuple with a scalar
+   `0`, and without that fallback the compression-ratio check has no way to
+   break a repetition loop: the first run got stuck repeating "Great." from
+   00:22:08 to the end of the video, 3471 times, and only the first 22 minutes
+   of 80 were usable. Its SRT writer also calls `with_suffix()`, so
+   `--output-name "<slug>.es"` lands on `<slug>.srt` and the language tag is
+   lost. `whisper.cpp` has neither problem: temperature fallback is on by
+   default (`--temperature-inc 0.20`, `--no-fallback` false).
+
+   **ASR needs cookies; published subtitles do not.** yt-dlp reads subtitle
+   tracks fine without a session, but the audio formats returned 403 to both the
+   native downloader and ffmpeg. Only `--cookies-from-browser` got the audio
+   down. Whatever implements `--asr` has to pass cookies to yt-dlp or it will
+   fail on exactly the videos that need ASR. Two sharp edges there:
+   `--cookies-from-browser chrome` hangs forever on the macOS keychain prompt if
+   nobody answers it, and a Chrome profile may have to be named explicitly
+   (`"chrome:Profile 1"`).
+
+   **Whisper is forced to one language and does not code-switch out of it.**
+   That video projects an English promo clip for four minutes; with `-l es` it
+   came out as unusable spanglish. When a transcript has a stretch of embedded
+   foreign-language material, mark it in the note instead of summarising it.
 
 2. **Pick the language interactively.** If you ask for `--lang es` and only
    English exists, today it warns and uses whatever it finds. Better: list what
