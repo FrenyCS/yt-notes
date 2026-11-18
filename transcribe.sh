@@ -19,6 +19,7 @@ OUTDIR="${HERE}/output"
 LANGS_FALLBACK="es,en"
 LANGS="$LANGS_FALLBACK"
 LANGS_EXPLICIT=0
+ORIG_LANG=""
 FORCE=0
 LIST_ONLY=0
 URL=""
@@ -151,6 +152,7 @@ LANGUAGE="$(printf '%s\n' "$META" | awk 'NR==6')"
 # subtitles lose it precisely there.
 if [ "$LANGS_EXPLICIT" -eq 0 ] && [ -n "$LANGUAGE" ] && [ "$LANGUAGE" != "NA" ]; then
   LANGS="$LANGUAGE"
+  ORIG_LANG="${LANGUAGE%%-*}"
   # yt-dlp reports the regional variant ("es-US") but the subtitle track is
   # usually named plainly ("es"), so both get requested. It is still a single
   # language: no video publishes both, so whichever exists is the one that
@@ -286,6 +288,19 @@ fi
 
 if [ -z "$SRT" ]; then
   download_subs
+
+  # On videos with only auto-generated captions, YouTube exposes the same
+  # speech twice: "<lang>" and "<lang>-orig". The plain one can return 429 on
+  # every attempt while "-orig" downloads fine (seen on three videos in a row,
+  # Nov 2026, and a yt-dlp upgrade did not change it). It is still the original
+  # language, so it gets one request of its own before giving up on it. Not
+  # requested up front: when a manual track exists, that is the better one, and
+  # yt-dlp stops at the first track that fails.
+  if [ -z "$SRT" ] && [ "$LANGS_EXPLICIT" -eq 0 ] && [ -n "$ORIG_LANG" ]; then
+    echo "warning: nothing came through for '$LANGS'; trying the original-language auto track (${ORIG_LANG}-orig)." >&2
+    LANGS="${ORIG_LANG}-orig"
+    download_subs
+  fi
 
   # A single language was requested, the video's original. Only if that one has
   # no published subtitles is one more request spent on the fallback list:

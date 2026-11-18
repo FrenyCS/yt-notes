@@ -132,6 +132,13 @@ to the source, not decoration.
   is "Spanish from English": on a Spanish-language video, a round trip. That is
   why the `.srt` search matches exactly and `-orig`, and never `${lang}-*`.
   Regional variants (`es-419`) are requested explicitly.
+- **On auto-caption-only videos, `<lang>` can 429 while `<lang>-orig` works.**
+  Both are the same speech in the original language. Seen on three videos in a
+  row (Nov 2026), and upgrading yt-dlp did not fix it. That is why, when the
+  original language yields nothing, `transcribe.sh` spends one request on
+  `<lang>-orig` before the `es,en` fallback. It is not requested up front:
+  a manual track, when it exists, is better, and yt-dlp stops at the first
+  track that fails.
 - An `[ ... ] && echo ...` as the last statement of a script makes it exit 1
   whenever the test is false, because that is the status the AND-OR list leaves
   behind. Use an `if` when the line is at the end.
